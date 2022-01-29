@@ -17,12 +17,8 @@ WORKDIR /usr/app/
 
 ADD . /usr/app/
 
-RUN pip install --upgrade numpy pandas setuptools "tqdm>=4.27,<4.50.0" wheel
+RUN pip install --upgrade wheel
 
-# install bittensor
-RUN git clone https://github.com/opentensor/bittensor.git \
-    && python3 -m pip install -e bittensor/  --no-cache-dir
-
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt --no-cache-dir
 
 CMD [ "python3", "main.py" ]

@@ -60,7 +60,7 @@ class Database:
             return Balance.from_rao(balance_rao).tao
         return None
 
-    async def record_tip(self, tip: Tip) -> None:
+    async def record_tip(self, tip) -> None:
         assert self.db is not None
         new_doc: Dict = {
             "amount": Balance.from_tao(tip.amount).rao,
@@ -77,7 +77,7 @@ class Database:
         except Exception as e:
             print(e)
 
-    async def record_transaction(self, transaction: Transaction) -> None:
+    async def record_transaction(self, transaction) -> None:
         assert self.db is not None
         new_doc: Dict = {
             "amount": Balance.from_tao(transaction.amount).rao,
@@ -135,7 +135,7 @@ class Database:
         except Exception as e:
             print(e)
 
-    async def get_deposit_addr(self, transaction: Transaction) -> str:
+    async def get_deposit_addr(self, transaction) -> str:
         assert self.db is not None
 
         # check if already has an address

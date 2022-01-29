@@ -3,3 +3,8 @@ substrate-interface
 scalecodec
 cryptography
 discord
+git+https://github.com/opentensor/bittensor.git#bittensor
+numpy
+pandas
+setuptools
+tqdm>=4.27,<4.50.0
