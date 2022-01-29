@@ -1,0 +1,5 @@
+pymongo
+substrate-interface
+scalecodec
+cryptography
+discord
