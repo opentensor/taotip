@@ -16,21 +16,23 @@ def main() -> None:
     @client.event
     async def on_ready():
         print('We have logged in as {0.user}'.format(client))
-        if (not api.test_connection()):
-            print("Error: Can't connect to")
-            client.logout()
+        if (not (await api.test_connection())):
+            print("Error: Can't connect to subtensor node")
+            await client.close()
             return
         print("Connected to Bittensor!")
 
         try:
             _db = Database(config.MONGO_URI)
+            for _ in range(10):
+                print(await _db.create_new_addr())
         except Exception as e:
             print(e)
             print("Can't connect to db")
-            client.logout()        
+            await client.close()     
+            return   
 
-        for _ in range(10):
-            print(_db.create_new_addr())
+        
         exit(0)
 
         balance = 0
@@ -105,6 +107,7 @@ def main() -> None:
 
     @asyncio.coroutine
     def check_deposit():
+        return
         assert _db is not None
         while True:
             print("Checking for new deposits...")

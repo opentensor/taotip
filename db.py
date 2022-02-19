@@ -330,13 +330,11 @@ class Address:
     address: str # the public coldkeyaddr
     mnemonic: str # mnemonic
 
-    def __init__(self, address: str, mnemonic: str) -> None:
+    def __init__(self, address: str, mnemonic: bytes, key: bytes = None) -> None:
         self.address = address
         self.mnemonic = mnemonic
-
-    def __init__(self, address: str, mnemonic: bytes, key: bytes) -> None:
-        self.address = address
-        self.mnemonic = self.__unencrypt(mnemonic, key)
+        if (key):
+            self.mnemonic = self.__unencrypt(mnemonic, key)
 
     def get_encrypted_mnemonic(self) -> bytes:
         return self.__encrypt(self.mnemonic, config.COLDKEY_SECRET)

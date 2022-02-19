@@ -1,4 +1,4 @@
-pymongo
+pymongo[srv]
 substrate-interface
 scalecodec
 cryptography
