@@ -13,4 +13,7 @@ CHECK_ALL_INTERVAL=600.0 # seconds
 SUBTENSOR_ENDPOINT="<>:9944"
 TESTING=False
 NUM_DEPOSIT_ADDRESSES=10
-HELP_STR=""
+HELP_STR="To get your balance, type: `!balance` or `!bal`\n" + \
+        "To deposit tao, type: `!deposit <amount>`\n" + \
+        "To withdraw your tao, type: `!withdraw <amount>`\n" + \
+        f"For help, type: `!h` or `!help` or contact {MAINTAINER}\n"
