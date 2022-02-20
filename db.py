@@ -18,10 +18,10 @@ class Database:
         database_str: str = "test" if testing else "prod"
         self.db = self.client[database_str]
 
-    async def check_balance(self, name: str) -> Optional[float]:
+    async def check_balance(self, user_id: str) -> Optional[float]:
         assert self.db is not None
         query: Dict = {
-            "discord_user": name
+            "discord_user": user_id
         }
 
         projection: Dict = {
@@ -43,7 +43,7 @@ class Database:
         }
 
         update: Dict = {
-            "$add": {
+            "$inc": {
                 "balance": Balance.from_tao(amount).rao
             }
         }
@@ -52,7 +52,7 @@ class Database:
             "balance": True
         }
 
-        doc: Dict = await self.db.balances.find_one_and_update(
+        doc: Dict = self.db.balances.find_one_and_update(
             query,
             update,
             projection=projection,
@@ -60,7 +60,7 @@ class Database:
             return_document=ReturnDocument.AFTER
         )
         if (doc is not None):
-            balance_rao: int = doc.balance
+            balance_rao: int = doc["balance"]
             return Balance.from_rao(balance_rao).tao
         return None
 
@@ -85,13 +85,13 @@ class Database:
         assert self.db is not None
         new_doc: Dict = {
             "amount": Balance.from_tao(transaction.amount).rao,
-            "user": transaction.sender,
+            "user": transaction.user,
             "time": transaction.time
         }
         
         # fail silently
         try:
-            result: pymongo.results.InsertOneResult = await self.db.transactions.insert_one(
+            result: pymongo.results.InsertOneResult = self.db.transactions.insert_one(
                 new_doc
             )
         except Exception as e:
@@ -100,13 +100,10 @@ class Database:
     async def get_withdraw_addresses(self) -> List[str]:
         assert self.db is not None
         query: Dict = {
-            "locked": False,
-            "$orderby": {
-                "balance": -1
-            }
+            "locked": False
         }
 
-        addrs: List[Dict] = await self.db.addresses.find(query)
+        addrs: List[Dict] = list(self.db.addresses.find(query).sort("balance", pymongo.DESCENDING))
         return addrs
 
     async def lock_addr(self, address: Union[str, Dict]) -> bool:
@@ -151,7 +148,7 @@ class Database:
         }
 
         update: Dict = {"$set": {
-            "unlock": datetime.now() + datetime.timedelta(seconds=expiry)
+            "unlock": datetime.now() + timedelta(seconds=expiry)
         }}
         self.db.addresses.update_one(_query, update)
         return None
@@ -161,21 +158,24 @@ class Database:
 
         # check if already has an address
         # if so, increase time
-        _doc: Dict = await self.db.addresses.find_one_and_update({
-            "user": transaction.user.name
+        _doc: Dict = self.db.addresses.find_one_and_update({
+            "user": transaction.user
         }, {
-            "unlock": datetime.now() + timedelta(seconds=config.DEP_ACTIVE_TIME),
+            "$set": {
+                "unlock": datetime.now() + timedelta(seconds=config.DEP_ACTIVE_TIME),
+            }
         }, return_document=ReturnDocument.AFTER)
-        if (_doc is not None):
+
+        if _doc is not None:
             return _doc["address"]
 
         query: Dict = {
             "locked": False
         }
 
-        doc: Dict = await self.db.addresses.find_one(query)
+        doc: Dict = self.db.addresses.find(query).sort('balance', pymongo.DESCENDING)[0]
 
-        while(not (await self.lock_addr(doc.address))):
+        while(not (await self.lock_addr(doc["address"]))):
             doc = self.db.addresses.find_one(query)
             await asyncio.sleep(1)
         
@@ -183,9 +183,6 @@ class Database:
         # add unlock time
         _query: Dict = {
             "address": doc["address"],
-            "$orderby": {
-                "balance": -1
-            }
         }
 
         update: Dict = {"$set": {
@@ -300,9 +297,9 @@ class Tip:
         return f"{self.amount} tao"
 
     async def send(self, db: Database) -> bool:
-        if (self.amount < 0):
+        if (self.amount < 0 or self.sender == self.recipient):
             return False
-        balance = await db.check_balance(self.sender)
+        balance = await db.check_balance(self.sender.id)
         if (balance < self.amount):
             return False
         db.update_balance(self.sender, -self.amount)
@@ -328,31 +325,32 @@ class Transaction:
         if (self.amount < 0):
             raise "Amount invalid"
 
-        if api.verify_coldkeyadd(coldkeyadd):
-            raise "withdraw coldkeyadd invalid"
+        if not api.verify_coldkeyadd(coldkeyadd):
+            raise Exception("withdraw coldkeyadd invalid")
 
         # gets balance in tao (float)
-        balance = db.check_balance(self.user)
+        balance = await db.check_balance(self.user)
         if (balance < self.amount):
-            raise "Balance too low to withdraw"
+            raise Exception("Balance too low to withdraw")
         
         # get withdraw_addr to withdraw from
         try:
             withdraw_fee = await api.get_withdraw_fee()
 
             if (balance < self.amount + withdraw_fee):
-                raise "Balance too low to withdraw"
+                raise Exception("Balance too low to withdraw")
 
             self.fee = withdraw_fee
 
             new_balance = await db.update_balance(self.user, -self.amount + -self.fee)
             await db.record_transaction(self)
 
-            withdraw_addr, amounts = await api.find_withdraw_address(self)
+            withdraw_addr, amounts = await api.find_withdraw_address(db, self)
 
         except Exception as e:
             print(e, "db.withdraw")
             raise "Withdraw error; Not enough tao in wallets"
+
         for addr, amount in zip(withdraw_addr, amounts):
             api_transaction = {
                 "coldkeyadd": addr,
@@ -372,7 +370,7 @@ class Transaction:
     async def deposit(self, db: Database) -> float:
         if (self.amount < 0):
             raise "Amount invalid"
-        new_balance = db.update_balance(self.user, self.amount)
+        new_balance = await db.update_balance(self.user, self.amount)
         await db.record_transaction(self)
         return new_balance
 

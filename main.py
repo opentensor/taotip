@@ -39,7 +39,7 @@ def main() -> None:
             print("Can't connect to db")
             await client.close()     
             return
-        #exit(0)
+
         balance = Balance(0.0)
         addrs: List[Dict] = list(await _db.get_all_addresses())
         for addr in tqdm(addrs, "Checking Balances..."):
@@ -98,13 +98,17 @@ def main() -> None:
             if (validate.is_help(message.content)):
                 await channel.send(config.HELP_STR)
             elif (validate.is_balance_check(message.content)):
-                balance = await _db.check_balance(user.name)
+                balance = await _db.check_balance(user.id)
                 
                 await channel.send(f"Your balance is {balance} tao")
             elif (validate.is_deposit_or_withdraw(message.content)):
-                amount = parse.get_amount(message.content)
+                try:
+                    amount = parse.get_amount(message.content)
+                except Exception as e:
+                    await channel.send(f"Incorrect format.\n" + config.HELP_STR)
+                    return
                 
-                t = Transaction(user.name, amount)
+                t = Transaction(user.id, amount)
                 new_balance: int = None
 
                 if (validate.is_deposit(message.content)):
@@ -113,7 +117,7 @@ def main() -> None:
                         deposit_addr = await _db.get_deposit_addr(t)
                         await channel.send(f"Please deposit to {deposit_addr}. This address will be active for {datetime.timedelta(seconds=config.DEP_ACTIVE_TIME)}.")
                     except Exception as e:
-                        print(e)
+                        print(e, "main.on_message")
                         await channel.send("No deposit addresses available.")
                 else:
                     # must be withdraw
@@ -121,7 +125,7 @@ def main() -> None:
                     try:
                         new_balance = await t.withdraw(_db, coldkeyadd)
                     except Exception as e:
-                        print(e)
+                        print(e, "main withdraw")
                         await channel.send("Error making withdraw. Please contact " + config.MAINTAINER)
 
                 if (t):
@@ -145,7 +149,11 @@ def main() -> None:
             deposits: List[Transaction] = await api.check_for_deposits(_db)
             if (len(deposits) > 0):
                 for deposit in tqdm(deposits, desc="Depositing..."):
-                    deposit.deposit(_db)
+                    new_balance = await deposit.deposit(_db)
+                    if deposit.amount > 0.0:
+                        user = client.get_user(deposit.user)
+                        if user is not None:
+                            await user.send(f"Success! Deposited {deposit.amount} tao. Your balance is {new_balance} tao.")
             print("Done Check")
             print("Removing old locks from deposit addresses...")
             # remove old locks

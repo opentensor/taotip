@@ -112,16 +112,17 @@ def init_transaction(coldkeyadd: str, dest: str, amount: bittensor.Balance) -> T
 def verify_coldkeyadd(coldkeyadd: str) -> bool:
     subtensor = bittensor.subtensor(chain_endpoint=config.SUBTENSOR_ENDPOINT)
     with subtensor.substrate as substrate:
-        return substrate.is_valid_ss58_address(coldkeyadd)
+        is_valid = substrate.is_valid_ss58_address(coldkeyadd)
+        return is_valid
 
-async def find_withdraw_address(_db: Database, transation: Transaction) -> Tuple[List[str], List[float]]:
+async def find_withdraw_address(_db: Database, transaction: Transaction) -> Tuple[List[str], List[float]]:
     """
     Finds valid withdraw addresses with available balance.
     """
     final_addrs: List[str] = []
     final_amts: List[float] = []
-    remaining_balance: float = transation.amount
-    fee: float = transation.fee
+    remaining_balance: float = transaction.amount
+    fee: float = transaction.fee
     # get all possible withdraw addresses
     withdraw_addrs: List[str] = await _db.get_withdraw_addresses()
     for addr in withdraw_addrs:
@@ -192,10 +193,9 @@ async def check_for_deposits(_db: Database) -> List[Transaction]:
         change, user = result
         
         if (change > 0):
-            new_transaction = Transaction(user, change)
+            new_transaction = Transaction(user, bittensor.Balance.from_rao(change).tao)
             new_transactions.append(new_transaction)
     return new_transactions
 
 async def get_withdraw_fee() -> float:
     return 0.125
-
