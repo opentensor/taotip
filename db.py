@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 import pymongo
 from pymongo import ReturnDocument
 import pymongo.results
@@ -7,11 +7,13 @@ import api
 import config
 from bittensor import Balance
 from cryptography.fernet import Fernet
+import asyncio
+
 class Database:
     client: pymongo.MongoClient
     db = None
 
-    def __init__(self, mongo_uri: str, testing: str = False) -> None:
+    def __init__(self, mongo_uri: str, testing: bool = False) -> None:
         self.client = pymongo.MongoClient(mongo_uri)
         database_str: str = "test" if testing else "prod"
         self.db = self.client[database_str]
@@ -26,12 +28,13 @@ class Database:
             "balance": True
         }
 
-        doc: Dict = await self.db.balances.find_one(query, projection=projection)
+        doc: Dict = self.db.balances.find_one(query, projection=projection)
         if (doc is not None):
-            balance_rao: int = doc.balance
+            balance_rao: int = doc["balance"]
 
             return Balance.from_rao(balance_rao).tao
-        return None
+            
+        return Balance.from_rao(0).tao
 
     async def update_balance(self, name: str, amount: float) -> Optional[float]:
         assert self.db is not None
@@ -53,6 +56,7 @@ class Database:
             query,
             update,
             projection=projection,
+            upsert=True,
             return_document=ReturnDocument.AFTER
         )
         if (doc is not None):
@@ -91,33 +95,39 @@ class Database:
                 new_doc
             )
         except Exception as e:
-            print(e)
+            print(e, "db.record_transaction")
 
     async def get_withdraw_addresses(self) -> List[str]:
         assert self.db is not None
         query: Dict = {
-            "locked": False
+            "locked": False,
+            "$orderby": {
+                "balance": -1
+            }
         }
 
         addrs: List[Dict] = await self.db.addresses.find(query)
         return addrs
 
-    async def lock_addr(self, address: str) -> bool:
+    async def lock_addr(self, address: Union[str, Dict]) -> bool:
         assert self.db is not None
+        if not isinstance(address, str):
+            address = address["address"]
+
         query: Dict = {
             "address": address
         }
 
-        update: Dict = {
+        update: Dict = {"$set": {
             "locked": True
-        }
+        }}
 
         try:
             # returns original
-            doc: Dict = await self.db.addresses.find_one_and_update(query, update, return_document=ReturnDocument.BEFORE)
-            return doc.locked # checks if locked before update happened
+            doc: Dict = self.db.addresses.find_one_and_update(query, update, return_document=ReturnDocument.BEFORE)
+            return doc is not None and (not doc["locked"]) # checks if locked before update happened
         except Exception as e:
-            print(e)
+            print(e, "db.lock_addr")
             return False
 
     async def unlock_addr(self, address: str) -> None:
@@ -126,14 +136,25 @@ class Database:
             "address": address
         }
 
-        update: Dict = {
+        update: Dict = { "$set": {
             "locked": False
-        }
+        }}
 
         try:
             await self.db.addresses.update_one(query, update)
         except Exception as e:
             print(e)
+
+    async def set_lock_expiry(self, address: str, expiry: int) -> None:
+        _query: Dict = {
+            "address": address
+        }
+
+        update: Dict = {"$set": {
+            "unlock": datetime.now() + datetime.timedelta(seconds=expiry)
+        }}
+        self.db.addresses.update_one(_query, update)
+        return None
 
     async def get_deposit_addr(self, transaction) -> str:
         assert self.db is not None
@@ -146,7 +167,7 @@ class Database:
             "unlock": datetime.now() + timedelta(seconds=config.DEP_ACTIVE_TIME),
         }, return_document=ReturnDocument.AFTER)
         if (_doc is not None):
-            return _doc.address
+            return _doc["address"]
 
         query: Dict = {
             "locked": False
@@ -155,37 +176,47 @@ class Database:
         doc: Dict = await self.db.addresses.find_one(query)
 
         while(not (await self.lock_addr(doc.address))):
-            doc = await self.db.addresses.find_one(query)
+            doc = self.db.addresses.find_one(query)
+            await asyncio.sleep(1)
         
         # should've locked an address now
         # add unlock time
         _query: Dict = {
-            "address": doc.address,
+            "address": doc["address"],
+            "$orderby": {
+                "balance": -1
+            }
         }
 
-        update: Dict = {
+        update: Dict = {"$set": {
             "unlock": datetime.now() + timedelta(seconds=config.DEP_ACTIVE_TIME),
             "user": transaction.user
-        }
+        }}
 
-        await self.db.addresses.update_one(_query, update)
-        return doc.address
+        self.db.addresses.update_one(_query, update)
+        return doc["address"]
 
     async def remove_old_locks(self) -> None:
         assert self.db is not None
         query: Dict = {
-            "unlock": {
-                "$lte": datetime.now()
-            }
+            "$or": [
+                { "unlock": 
+                    {"$lte": datetime.now() }
+                },
+                { "unlock": None }
+            ]
         }
 
         update: Dict = {
-            "unlock": None,
-            "locked": False,
-            "user": None
+            "$set": {
+                "unlock": None,
+                "locked": False,
+                "user": None
+            }
         }
 
-        await self.db.addresses.update_many(query, update)
+        result = self.db.addresses.update_many(query, update)
+        return result.modified_count if result is not None else None
 
     async def create_new_addr(self) -> str:
         assert self.db is not None
@@ -216,7 +247,7 @@ class Database:
 
         try:
             doc: Dict = await self.db.addresses.find_one(query)
-            addr = Address(doc.address, doc.mnemonic, config.COLDKEY_SECRET)
+            addr = Address(doc["address"], doc["mnemonic"], config.COLDKEY_SECRET)
             return addr
         except Exception as e:
             print(e)
@@ -224,7 +255,16 @@ class Database:
 
     async def get_all_addresses(self) -> List[str]:
         assert self.db is not None
-        return await self.db.addresses.find({})
+        return list(self.db.addresses.find({}))
+
+    async def get_all_addresses_with_lock(self) -> List[str]:
+        assert self.db is not None
+
+        query: Dict = {
+            "locked": True
+        }
+
+        return self.db.addresses.find(query)
 
     async def update_addr_balance(self, addr: str, balance_rao: int) -> Tuple[int, str]:
         assert self.db is not None
@@ -234,15 +274,16 @@ class Database:
         }
 
         update: Dict = {
-            "balance": balance_rao
+            "$set": {"balance": balance_rao }
         }
 
         try:
-            result: Dict = await self.db.addresses.find_one_and_update(query, update)
-            return balance_rao - result.balance, result.user
+            result: Dict = self.db.addresses.find_one_and_update(query, update)
+            return balance_rao - result["balance"], result["user"]
         except Exception as e:
             print(e)
             return None
+
 class Tip:
     time: datetime
     amount: float
@@ -256,12 +297,12 @@ class Tip:
         self.time = time
 
     def __str__(self) -> str:
-        return f"{self.amount} tau"
+        return f"{self.amount} tao"
 
-    def send(self, db: Database) -> bool:
+    async def send(self, db: Database) -> bool:
         if (self.amount < 0):
             return False
-        balance = db.check_balance(self.sender)
+        balance = await db.check_balance(self.sender)
         if (balance < self.amount):
             return False
         db.update_balance(self.sender, -self.amount)
@@ -273,14 +314,15 @@ class Transaction:
     time: datetime
     amount: float
     user: str
+    fee: float
 
-    def __init__(self, user:str, amount: int, time: datetime = datetime.now()) -> None:
+    def __init__(self, user:str, amount: float, time: datetime = datetime.now()) -> None:
         self.amount = amount
         self.user = user
         self.time = time
 
     def __str__(self) -> str:
-        return f"{self.amount} tau"
+        return f"{self.amount} tao"
 
     async def withdraw(self, db: Database, coldkeyadd: str) -> float:
         if (self.amount < 0):
@@ -293,15 +335,23 @@ class Transaction:
         balance = db.check_balance(self.user)
         if (balance < self.amount):
             raise "Balance too low to withdraw"
-
-        new_balance = await db.update_balance(self.user, -self.amount)
-        await db.record_transaction(self)
         
         # get withdraw_addr to withdraw from
         try:
+            withdraw_fee = await api.get_withdraw_fee()
+
+            if (balance < self.amount + withdraw_fee):
+                raise "Balance too low to withdraw"
+
+            self.fee = withdraw_fee
+
+            new_balance = await db.update_balance(self.user, -self.amount + -self.fee)
+            await db.record_transaction(self)
+
             withdraw_addr, amounts = await api.find_withdraw_address(self)
+
         except Exception as e:
-            print(e)
+            print(e, "db.withdraw")
             raise "Withdraw error; Not enough tao in wallets"
         for addr, amount in zip(withdraw_addr, amounts):
             api_transaction = {

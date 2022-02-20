@@ -1,6 +1,6 @@
 import re
 from config import PROMPT, BAL_PROMPT, DEP_PROMPT, WIT_PROMPT, HELP_PROMPT
-check = re.compile(r'^' + PROMPT + r' <@![0-9]+?> ([0-9]+(|\.[0-9]*))( tau| tau|)$')
+check = re.compile(r'^' + PROMPT + r' <@![0-9]+?> ([0-9]+(|\.[0-9]*))( tao| tao|)$')
 bal_check = re.compile(r'^' + BAL_PROMPT + r'$')
 with_check = re.compile(r'^' + WIT_PROMPT + r'$')
 dep_check = re.compile(r'^' + DEP_PROMPT + r'$')

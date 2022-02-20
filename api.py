@@ -7,10 +7,11 @@ from db import Address, Database, Transaction
 from substrateinterface import Keypair
 import bittensor
 import config
+from tqdm import tqdm
 
 async def get_wallet_balance(coldkeyadd: str) -> int:
     subtensor = bittensor.subtensor(chain_endpoint=config.SUBTENSOR_ENDPOINT)
-    return await subtensor.get_balance(address=coldkeyadd)
+    return subtensor.get_balance(address=coldkeyadd)
 
 def send_transaction(transaction) -> Optional[Dict]:
     signature = transaction['signature']
@@ -28,7 +29,7 @@ def send_transaction(transaction) -> Optional[Dict]:
             'balance': balance
         }
     except(Exception) as e:
-        print(e)
+        print(e, "api.send_transaction")
         return None
 
 def send_transaction_(call: GenericCall, signature_payload: ScaleBytes, coldkeyadd: str, signature: str):
@@ -81,7 +82,7 @@ def create_transaction(transaction: Dict) -> Optional[Dict]:
             'call': call.data.to_hex(),
         }
     except(Exception) as e:
-        print(e)
+        print(e, "api.create_transaction")
         return None
 
 def init_transaction(coldkeyadd: str, dest: str, amount: bittensor.Balance) -> Tuple[GenericCall, ScaleBytes, Any]:
@@ -120,6 +121,7 @@ async def find_withdraw_address(_db: Database, transation: Transaction) -> Tuple
     final_addrs: List[str] = []
     final_amts: List[float] = []
     remaining_balance: float = transation.amount
+    fee: float = transation.fee
     # get all possible withdraw addresses
     withdraw_addrs: List[str] = await _db.get_withdraw_addresses()
     for addr in withdraw_addrs:
@@ -131,11 +133,13 @@ async def find_withdraw_address(_db: Database, transation: Transaction) -> Tuple
                 
                 amt: float = 0.0
 
-                if (balance >= remaining_balance):
+                if (balance >= remaining_balance + fee):
                     amt = remaining_balance
                     remaining_balance = 0.0
                 else:
-                    amt = balance
+                    amt = balance - fee
+                    if amt <= 0.0:
+                        continue
                 
                 remaining_balance -= amt
                 final_addrs.append(addr)
@@ -177,15 +181,21 @@ async def test_connection() -> bool:
     return subtensor.connect(failure=False)
 
 async def check_for_deposits(_db: Database) -> List[Transaction]:
-    addrs: List[str] = _db.get_all_addresses()
+    addrs: List[Address] = list(await _db.get_all_addresses_with_lock())
     new_transactions: List[Transaction] = []
-    for addr in addrs:
-        balance = await get_wallet_balance(addr)
-        change, user = await _db.update_addr_balance(addr, balance)
-        if (change >= 0):
+    for addr in tqdm(addrs, desc="Checking Deposits..."):
+        balance = await get_wallet_balance(addr["address"])
+        result = await _db.update_addr_balance(addr["address"], balance.rao)
+        if result is None:
+            print("Error checking deposits")
+            return []
+        change, user = result
+        
+        if (change > 0):
             new_transaction = Transaction(user, change)
             new_transactions.append(new_transaction)
     return new_transactions
 
-
+async def get_withdraw_fee() -> float:
+    return 0.125
 

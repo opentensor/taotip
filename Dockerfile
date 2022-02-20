@@ -21,4 +21,4 @@ RUN pip install --upgrade wheel
 
 RUN pip install -r requirements.txt --no-cache-dir
 
-CMD [ "python3", "main.py" ]
+CMD [ "/bin/bash" ]
