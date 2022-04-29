@@ -101,6 +101,9 @@ def main() -> None:
                     sender = message.author
                     amount = parse.get_amount(message.content)
                     recipient = message.mentions[0]
+                    if ((await client.fetch_user(recipient.id)) is None):
+                        await channel.send(f"{message.author.mention} {recipient.mention} is not a valid user!")
+                        return
                     t = Tip(sender.id, recipient.id, amount)
 
                     if (await t.send(_db)):
@@ -181,7 +184,10 @@ def main() -> None:
                 for deposit in tqdm(deposits, desc="Depositing..."):
                     new_balance = await deposit.deposit(_db)
                     if deposit.amount > 0.0:
-                        user = await client.fetch_user(deposit.user)
+                        try:
+                            user = await client.fetch_user(deposit.user)
+                        except Exception as e:
+                            print(e, "main.check_deposit", "fetch_user", deposit.user)
                         if user is not None:
                             await user.send(f"Success! Deposited {deposit.amount} tao.\nYour balance is: {new_balance} tao.")
             print("Done Check")

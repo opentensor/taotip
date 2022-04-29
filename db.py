@@ -247,7 +247,7 @@ class Database:
         }
 
         try:
-            result = await self.db.addresses.insert_one(doc)
+            result = self.db.addresses.insert_one(doc)
             return new_address.address
         except Exception as e:
             print(e)
