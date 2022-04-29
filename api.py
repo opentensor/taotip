@@ -12,8 +12,8 @@ class API:
     network: str
 
     def __init__(self, testing: bool=True) -> None:
-        # TODO: remove FALSE
-        if False and testing:
+        # Uses testnet if testing is true
+        if testing:
             self.network = 'Nobunaga'
             self.subtensor = bittensor.subtensor(network="nobunaga")
         else:
