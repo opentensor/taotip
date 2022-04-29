@@ -12,8 +12,10 @@ import asyncio
 class Database:
     client: pymongo.MongoClient
     db = None
+    api: 'api.API' = None
 
-    def __init__(self, mongo_uri: str, testing: bool = False) -> None:
+    def __init__(self, api: 'api.API', mongo_uri: str, testing: bool = False) -> None:
+        self.api = api
         self.client = pymongo.MongoClient(mongo_uri)
         database_str: str = "test" if testing else "prod"
         self.db = self.client[database_str]
@@ -75,7 +77,7 @@ class Database:
         
         # fail silently
         try:
-            result: pymongo.results.InsertOneResult = await self.db.tips.insert_one(
+            result: pymongo.results.InsertOneResult = self.db.tips.insert_one(
                 new_doc
             )
         except Exception as e:
@@ -218,7 +220,7 @@ class Database:
     async def create_new_addr(self) -> str:
         assert self.db is not None
 
-        new_address: Address = await api.create_address()
+        new_address: Address = await self.api.create_address()
         doc: Dict = {
             "address": new_address.address,
             "mnemonic": new_address.get_encrypted_mnemonic(),
@@ -235,7 +237,7 @@ class Database:
             print(e)
             return None
     
-    async def get_address(self, addr: str) -> Dict:
+    def get_address(self, addr: str) -> Dict:
         assert self.db is not None
 
         query: Dict = {
@@ -243,7 +245,7 @@ class Database:
         }
 
         try:
-            doc: Dict = await self.db.addresses.find_one(query)
+            doc: Dict = self.db.addresses.find_one(query)
             addr = Address(doc["address"], doc["mnemonic"], config.COLDKEY_SECRET)
             return addr
         except Exception as e:
@@ -299,14 +301,27 @@ class Tip:
     async def send(self, db: Database) -> bool:
         if (self.amount < 0 or self.sender == self.recipient):
             return False
-        balance = await db.check_balance(self.sender.id)
+        balance = await db.check_balance(self.sender)
         if (balance < self.amount):
             return False
-        db.update_balance(self.sender, -self.amount)
-        db.update_balance(self.recipient, self.amount)
-        db.record_tip(self)
+        await db.update_balance(self.sender, -self.amount)
+        await db.update_balance(self.recipient, self.amount)
+        await db.record_tip(self)
         return True
 
+class WithdrawException(Exception):
+    def __init__(self, address: str, amount: int, reason: str) -> None:
+        super().__init__(f"{address} {amount} {reason}")
+        self.address = address
+        self.amount = amount
+        self.reason = reason
+
+class DepositException(Exception):
+    def __init__(self, address: str, amount: int, reason: str) -> None:
+        super().__init__(f"{address} {amount} {reason}")
+        self.address = address
+        self.amount = amount
+        self.reason = reason
 class Transaction:
     time: datetime
     amount: float
@@ -323,33 +338,32 @@ class Transaction:
 
     async def withdraw(self, db: Database, coldkeyadd: str) -> float:
         if (self.amount < 0):
-            raise "Amount invalid"
+            raise ValueError("Amount must be positive")
 
-        if not api.verify_coldkeyadd(coldkeyadd):
-            raise Exception("withdraw coldkeyadd invalid")
+        if not db.api.verify_coldkeyadd(coldkeyadd):
+            raise WithdrawException(coldkeyadd, self.amount, "withdraw coldkeyadd invalid")
 
         # gets balance in tao (float)
         balance = await db.check_balance(self.user)
         if (balance < self.amount):
-            raise Exception("Balance too low to withdraw")
+            raise WithdrawException(coldkeyadd, self.amount, "Balance too low to withdraw")
         
         # get withdraw_addr to withdraw from
-        try:
-            withdraw_fee = await api.get_withdraw_fee()
+        withdraw_fee = await db.api.get_withdraw_fee()
 
-            if (balance < self.amount + withdraw_fee):
-                raise Exception("Balance too low to withdraw")
+        if (balance < self.amount + withdraw_fee):
+            raise WithdrawException(coldkeyadd, self.amount, "Balance too low to withdraw")
+        self.fee = withdraw_fee
 
-            self.fee = withdraw_fee
-
+        try:           
             new_balance = await db.update_balance(self.user, -self.amount + -self.fee)
             await db.record_transaction(self)
 
-            withdraw_addr, amounts = await api.find_withdraw_address(db, self)
+            withdraw_addr, amounts = await db.api.find_withdraw_address(db, self)
 
         except Exception as e:
             print(e, "db.withdraw")
-            raise "Withdraw error; Not enough tao in wallets"
+            raise Exception("Withdraw error; Not enough tao in wallets")
 
         for addr, amount in zip(withdraw_addr, amounts):
             api_transaction = {
@@ -357,19 +371,19 @@ class Transaction:
                 "dest": coldkeyadd,
                 "amount": amount # in tao for this addr
             }
-            _transaction = await api.create_transaction(api_transaction)
-            _signed_transaction = await api.sign_transaction(self, _transaction, addr)
-            result = await api.send_transaction(_signed_transaction)
+            _transaction = await db.api.create_transaction(api_transaction)
+            _signed_transaction = await db.api.sign_transaction(db, _transaction, addr)
+            result = db.api.send_transaction(_signed_transaction)
             if (not result):
-                raise "Transaction failed"
-            balance = await api.get_wallet_balance(addr)
-            await db.update_addr_balance(addr, balance)
+                raise Exception("Transaction failed", 4)
+            balance: 'Balance' = result['balance']
+            await db.update_addr_balance(addr, balance.rao)
 
         return new_balance
     
     async def deposit(self, db: Database) -> float:
         if (self.amount < 0):
-            raise "Amount invalid"
+            raise ValueError("Amount must be positive")
         new_balance = await db.update_balance(self.user, self.amount)
         await db.record_transaction(self)
         return new_balance

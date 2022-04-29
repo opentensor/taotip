@@ -1,5 +1,6 @@
 import re
-amount_check = re.compile(r'(([1-9][0-9]*|0)(\.[0-9]*))')
+import config
+amount_check = re.compile(r' (([1-9][0-9]*|0)(\.*[0-9]*))\s*(' + config.CURRENCY + r'|$)')
 
 def get_amount(message: str) -> float:
     """
