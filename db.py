@@ -38,6 +38,22 @@ class Database:
             
         return Balance.from_rao(0).tao
 
+    def get_lock_expiry(self, addr: str) -> Optional[datetime]:
+        assert self.db is not None
+        query: Dict = {
+            "address": addr,
+            "locked": True,
+        }
+
+        projection: Dict = {
+            "unlock": True
+        }
+
+        doc: Dict = self.db.addresses.find_one(query, projection=projection)
+        if (doc is not None):
+            return doc["unlock"]
+        return None
+
     async def update_balance(self, name: str, amount: float) -> Optional[float]:
         assert self.db is not None
         query: Dict = {

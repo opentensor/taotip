@@ -1,3 +1,4 @@
+from time import strftime
 from typing import Dict, List
 import discord
 import config
@@ -5,6 +6,7 @@ import validate
 import parse
 import api
 from db import Tip, Transaction, Database, WithdrawException, DepositException
+import pytz
 import datetime
 import asyncio
 from bittensor import Balance
@@ -12,6 +14,18 @@ from tqdm import tqdm
 
 _db: Database = None
 _api: api.API = None
+
+from string import Template
+
+class DeltaTemplate(Template):
+    delimiter = "%"
+
+def strfdelta(tdelta, fmt):
+    d = {"D": tdelta.days}
+    d["H"], rem = divmod(tdelta.seconds, 3600)
+    d["M"], d["S"] = divmod(rem, 60)
+    t = DeltaTemplate(fmt)
+    return t.substitute(**d)
 
 def main() -> None:
     print("Running Tao Tip...")
@@ -119,7 +133,12 @@ def main() -> None:
                     try:
                         await channel.send(f"Remember, withdrawals have a network transfer fee!")
                         deposit_addr = await _db.get_deposit_addr(t)
-                        await channel.send(f"Please deposit to {deposit_addr}. This address will be active for {datetime.timedelta(seconds=config.DEP_ACTIVE_TIME)}.")
+                        expiry = _db.get_lock_expiry(deposit_addr)
+                        expiry_delta: datetime.timedelta = expiry - datetime.datetime.now()
+                        expiry_delta = strfdelta(expiry_delta, "%M minutes and %S seconds")
+                        expiry = expiry.astimezone(pytz.timezone("EST"))
+                        expiry_readable = expiry.strftime('%Y-%m-%d %H:%M:%S %Z')
+                        await channel.send(f"Please deposit to {deposit_addr}.\nThis address will be active for another {expiry_delta} until {expiry_readable}.\n")
                     except DepositException as e:
                         await channel.send(f"Error: {e}")
                         return
