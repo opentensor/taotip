@@ -1,6 +1,5 @@
 from typing import Dict, List
 import discord
-from numpy import isin
 import config
 import validate
 import parse
