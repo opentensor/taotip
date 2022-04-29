@@ -1,5 +1,3 @@
-import json
-from re import sub
 from typing import Any, Dict, List, Optional, Tuple
 from scalecodec.base import ScaleBytes, ScaleType
 from scalecodec.types import GenericCall
