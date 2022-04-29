@@ -1,7 +1,7 @@
 pymongo[srv]
-substrate-interface
-scalecodec
-cryptography
+substrate-interface==1.2.4
+scalecodec>=1.0.35
+cryptography>=3.1.1
 discord
 git+https://github.com/opentensor/bittensor.git#bittensor
 numpy
