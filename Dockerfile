@@ -42,4 +42,5 @@ RUN pip install setuptools
 
 RUN pip install -r requirements.txt --no-cache-dir
 
-CMD [ "python", "main.py" ]
+ENTRYPOINT [ "/usr/bin/python3" ]
+CMD [ "main.py" ]
