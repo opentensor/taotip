@@ -54,7 +54,8 @@ def main() -> None:
         print(f"Connected to Bittensor ({_api.network})!")
 
         try:
-            _db = Database(_api, config.MONGO_URI, config.TESTING)
+            mongo_uri = config.MONGO_URI_TEST if config.TESTING else config.MONGO_URI
+            _db = Database(_api, mongo_uri, config.TESTING)
             addrs: List[str] = list(await _db.get_all_addresses())
             num_addresses = len(addrs)
             if num_addresses < config.NUM_DEPOSIT_ADDRESSES:

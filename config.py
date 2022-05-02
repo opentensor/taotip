@@ -1,9 +1,8 @@
 DISCORD_TOKEN = ''
 CURRENCY = r'tao|t|tau|Tao|Tau|𝜏'
 PROMPT = '!tip'
-BOT_ID = ''
-COLDKEY_SECRET=b''
-MONGO_URI="mongodb+srv://taotip:password@mongodb_container/test?retryWrites=true&w=majority"
+MONGO_URI="mongodb+srv://taotip:prod_pass@mongodb_container/prod?retryWrites=true&w=majority"
+MONGO_URI_TEST="mongodb+srv://taotip:test_pass@mongodb_container/test?retryWrites=true&w=majority"
 BAL_PROMPT="(!balance)|(!bal)"
 DEP_PROMPT=f"!deposit ([1-9][0-9]*|0)(\.|\.[0-9]+)?\s*({CURRENCY}|)?"
 WIT_PROMPT=f"!withdraw (5([A-z]|[0-9])+)\s+([1-9][0-9]*|0)(\.|\.[0-9]+)?\s*({CURRENCY}|)?"
