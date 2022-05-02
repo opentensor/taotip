@@ -10,7 +10,6 @@ from websocket import WebSocketException
 import config
 from db import Address, Database, Transaction, WithdrawException
 
-
 class API:
     subtensor: bittensor.Subtensor = None
     network: str
@@ -25,7 +24,26 @@ class API:
             self.subtensor = bittensor.subtensor(network="local", chain_endpoint=config.SUBTENSOR_ENDPOINT)
 
     def get_wallet_balance(self, coldkeyadd: str) -> bittensor.Balance:
-        return self.subtensor.get_balance(address=coldkeyadd)
+        """
+        Returns the balance of the given address.
+
+        Args:
+            coldkeyadd: The ss58 address to get the balance of.
+        
+        Returns:
+            The balance of the given address: bittensor.Balance
+        
+        Raises:
+            - Exception: If the address is invalid.
+            - WebSocketException: If the connection to the Substrate node is lost.
+        
+        """
+        with self.subtensor.substrate as substrate:
+            if not substrate.is_valid_ss58_address(coldkeyadd):
+                raise Exception('invalid coldkey address coldkeyadd')
+
+        balance = self.subtensor.get_balance(address=coldkeyadd)
+        return balance
 
     def send_transaction(self, transaction) -> Optional[Dict]:
         signature = transaction['signature']

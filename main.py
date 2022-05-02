@@ -38,7 +38,14 @@ def main() -> None:
     async def on_ready():
         global _db
         global _api
-        _api = api.API(testing=config.TESTING)
+        try:
+            _api = api.API(testing=config.TESTING)
+        except WebSocketException as e:
+            print(e)
+            print("Failed to connect to Substrate node. Exiting...")
+            await client.close()     
+            return
+
         print('We have logged in as {0.user}'.format(client))
         if (not (await _api.test_connection())):
             print("Error: Can't connect to subtensor node")
@@ -182,7 +189,13 @@ def main() -> None:
 
         while True:
             # check for deposits
-            deposits: List[Transaction] = await _api.check_for_deposits(_db)
+            try:
+                deposits: List[Transaction] = await _api.check_for_deposits(_db)
+            except WebSocketException as e:
+                print(e)
+                await asyncio.sleep(config.CHECK_ALL_INTERVAL)
+                continue
+
             if (len(deposits) > 0):
                 for deposit in tqdm(deposits, desc="Depositing..."):
                     new_balance = await deposit.deposit(_db)
