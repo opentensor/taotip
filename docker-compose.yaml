@@ -12,6 +12,7 @@ services:
       - 27017:27017
     volumes:
       - mongodb_data_container:/data/db
+      - ./mongodb/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
   taotip:
     container_name: taotip
     build:
@@ -20,7 +21,6 @@ services:
       - taotip_data_container:/data/taotip
     depends_on:
       - mongodb_container
-      - ./mongodb/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
 
 volumes:
   mongodb_data_container:
