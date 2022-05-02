@@ -1,4 +1,4 @@
-from ..validate import is_valid_format
+from ..src.validate import is_valid_format
 import random
 
 def test_is_valid_format():
