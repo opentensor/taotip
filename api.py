@@ -1,14 +1,15 @@
 from typing import Any, Dict, List, Optional, Tuple
+
+import bittensor
 from scalecodec.base import ScaleBytes, ScaleType
 from scalecodec.types import GenericCall
 from substrateinterface import Keypair
-from websocket import WebSocketException
 from tqdm import tqdm
+from websocket import WebSocketException
 
-import bittensor
-
-from db import Address, Database, Transaction, WithdrawException
 import config
+from db import Address, Database, Transaction, WithdrawException
+
 
 class API:
     subtensor: bittensor.Subtensor = None

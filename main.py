@@ -1,16 +1,19 @@
+import asyncio
+import datetime
 from time import strftime
 from typing import Dict, List
+
 import discord
-import config
-import validate
-import parse
-import api
-from db import Tip, Transaction, Database, WithdrawException, DepositException
 import pytz
-import datetime
-import asyncio
 from bittensor import Balance
 from tqdm import tqdm
+from websocket import WebSocketException
+
+import api
+import config
+import parse
+import validate
+from db import Database, DepositException, Tip, Transaction, WithdrawException
 
 _db: Database = None
 _api: api.API = None
