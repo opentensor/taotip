@@ -1,6 +1,6 @@
 version: '3.9'
 services:
-  mongodb_container:
+  mongodb:
     container_name: container-mongodb
     image: mongo:5.0.8
     restart: always
@@ -20,7 +20,7 @@ services:
     volumes:
       - taotip_data_container:/data/taotip
     depends_on:
-      - mongodb_container
+      - mongodb
 
 volumes:
   mongodb_data_container:
