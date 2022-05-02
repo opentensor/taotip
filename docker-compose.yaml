@@ -1,0 +1,28 @@
+version: '3.9'
+services:
+  mongodb_container:
+    container_name: container-mongodb
+    build:
+      context: ./mongodb
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+
+    ports:
+      - 27017:27017
+    volumes:
+      - mongodb_data_container:/data/db
+  taotip:
+    container_name: taotip
+    build:
+      dockerfile: Dockerfile
+    volumes:
+      - taotip_data_container:/data/taotip
+    depends_on:
+      - mongodb_container
+
+volumes:
+  mongodb_data_container:
+  taotip_data_container:
