@@ -3,8 +3,6 @@ import os
 import argparse
 from hashlib import sha3_256
 
-from cryptography.fernet import Fernet
-
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -12,7 +10,6 @@ parser.add_argument("-p", "--passphrase", help="Secret passphrase", required=Fal
 
 if __name__ == "__main__":
     # generate a new, random, secret
-    ## key = Fernet.generate_key()
     args = parser.parse_args()
     if (args.passphrase is not None):
         passphrase: str = args.passphrase

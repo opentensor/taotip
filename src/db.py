@@ -1,13 +1,15 @@
-from typing import Dict, List, Optional, Tuple, Union
-import pymongo
-from pymongo import ReturnDocument
-import pymongo.results
+import asyncio
 from datetime import datetime, timedelta
-import api
-import config
+from typing import Dict, List, Optional, Tuple, Union
+
+import pymongo
+import pymongo.results
 from bittensor import Balance
 from cryptography.fernet import Fernet
-import asyncio
+from pymongo import ReturnDocument
+
+from . import api, config
+
 
 class Database:
     client: pymongo.MongoClient
@@ -236,7 +238,7 @@ class Database:
     async def create_new_addr(self) -> str:
         assert self.db is not None
 
-        new_address: Address = await self.api.create_address()
+        new_address: Address = self.api.create_address(key=config.COLDKEY_SECRET)
         doc: Dict = {
             "address": new_address.address,
             "mnemonic": new_address.get_encrypted_mnemonic(),
@@ -262,7 +264,7 @@ class Database:
 
         try:
             doc: Dict = self.db.addresses.find_one(query)
-            addr = Address(doc["address"], doc["mnemonic"], config.COLDKEY_SECRET)
+            addr = Address(doc["address"], doc["mnemonic"], config.COLDKEY_SECRET, decrypt=True)
             return addr
         except Exception as e:
             print(e)
@@ -408,14 +410,15 @@ class Address:
     address: str # the public coldkeyaddr
     mnemonic: str # mnemonic
 
-    def __init__(self, address: str, mnemonic: bytes, key: bytes = None) -> None:
+    def __init__(self, address: str, mnemonic: bytes, key: bytes, decrypt: bool = False) -> None:
         self.address = address
-        self.mnemonic = mnemonic
-        if (key):
+        self.mnemonic = mnemonic        
+        self.key = key
+        if (decrypt):
             self.mnemonic = self.__unencrypt(mnemonic, key)
 
     def get_encrypted_mnemonic(self) -> bytes:
-        return self.__encrypt(self.mnemonic, config.COLDKEY_SECRET)
+        return self.__encrypt(self.mnemonic, self.key)
 
     @staticmethod
     def __unencrypt(mnemonic_encrypted: bytes, key: bytes) -> str:

@@ -9,11 +9,8 @@ from bittensor import Balance
 from tqdm import tqdm
 from websocket import WebSocketException
 
-import api
-import config
-import parse
-import validate
-from db import Database, DepositException, Tip, Transaction, WithdrawException
+from .src import api, config, parse, validate
+from .src.db import Database, DepositException, Tip, Transaction, WithdrawException
 
 _db: Database = None
 _api: api.API = None

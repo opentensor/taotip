@@ -7,8 +7,8 @@ from substrateinterface import Keypair
 from tqdm import tqdm
 from websocket import WebSocketException
 
-import config
-from db import Address, Database, Transaction, WithdrawException
+from . import config
+from .db import Address, Database, Transaction, WithdrawException
 
 class API:
     subtensor: bittensor.Subtensor = None
@@ -208,11 +208,13 @@ class API:
         }
         return signed_transaction
 
-    async def create_address(self) -> Address:
+    @staticmethod
+    def create_address(key: bytes) -> Address:
         mnemonic = Keypair.generate_mnemonic(12)
         keypair = Keypair.create_from_mnemonic(mnemonic)
         address = keypair.ss58_address
-        return Address(address, mnemonic)
+        return Address(address, mnemonic, key)
+
 
     async def test_connection(self) -> bool:
         return self.subtensor.connect(failure=False)
