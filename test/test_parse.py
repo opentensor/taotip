@@ -1,4 +1,4 @@
-from ..src.parse import get_amount, get_coldkeyadd
+from ..src.parse import get_amount, get_coldkeyadd, is_valid_ss58_address
 import random
 import unittest
 from substrateinterface.utils import ss58
@@ -75,7 +75,7 @@ class TestGetAmount(unittest.TestCase):
         input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> {amount} taonot"
         self.assertRaises(ValueError, get_amount, input)
         
-class RandomColdkey(str):
+class RandomColdkey():
     _ck: str
 
     @staticmethod
@@ -86,22 +86,24 @@ class RandomColdkey(str):
         return good_addr
 
     def __str__(self):
-        self._ck = self._get_new_coldkey()
         return self._ck
 
     def __eq__(self, __x: object) -> bool:
         return self._ck == __x
+    
+    def startswith(self, __x: str) -> bool:
+        return self._ck.startswith(__x)
 
+    def next(self):
+        self._ck = self._get_new_coldkey()
+        return self
 
-def is_valid_ss58_address(addr: str, format: int) -> bool:
-    try:
-        ss58.is_valid_ss58_address
-        return True
-    except (ValueError, IndexError):
-        return False
+    def rstrip(self) -> str:
+        return self._ck.rstrip()
 
 class RandomBadColdkey(RandomColdkey):
-    _ck: str
+    def __init__(self) -> None:
+        super().__init__()
 
     @staticmethod
     def _get_new_bad_coldkey() -> str:
@@ -111,9 +113,9 @@ class RandomBadColdkey(RandomColdkey):
         bad_addr = good_addr[:i] + random.choice("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") + good_addr[i+1:]
         return bad_addr
 
-    def __str__(self):
-        self._ck = self._get_new_bad_coldkey()
-        return self._ck
+    def next(self):
+        self._ck = self._get_new_coldkey()
+        return self
         
 class TestGetColdkeyadd(unittest.TestCase):
     def test_get_coldkeyadd(self):
@@ -162,39 +164,39 @@ class TestGetColdkeyadd(unittest.TestCase):
         
         ## Test with ints
         ck = RandomColdkey()
-        input: str = f"!withdraw {ck} {random.randint(0, 1000)} tao"
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)} tao"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!deposit {ck} {random.randint(0, 1000)} tao"
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)} tao"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.randint(0, 1000)} tau"
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)} tau"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!deposit {ck} {random.randint(0, 1000)} Tau"
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)} Tau"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.randint(0, 1000)}t"
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)}t"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!deposit {ck} {random.randint(0, 1000)}t"
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)}t"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.randint(0, 1000)}𝜏"
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)}𝜏"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!deposit {ck} {random.randint(0, 1000)}"
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)}"
         self.assertEqual(get_coldkeyadd(input), ck)
 
         # Test with floats
-        input: str = f"!withdraw {ck} {random.random() * 1000}t"
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}t"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000}"
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000}𝜏"
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}𝜏"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000} tao"
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000} tao"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000} Tau"
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000} Tau"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000} Tao"
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000} Tao"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000}Tao"
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}Tao"
         self.assertEqual(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000}tao"
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}tao"
         self.assertEqual(get_coldkeyadd(input), ck)
 
     def test_get_coldkeyadd_random_bad_key(self):
@@ -203,54 +205,54 @@ class TestGetColdkeyadd(unittest.TestCase):
         
         ## Test with ints
         ck = RandomBadColdkey()
-        input: str = f"!withdraw {ck} {random.randint(0, 1000)} tao"
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)} tao"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!deposit {ck} {random.randint(0, 1000)} tao"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)} tao"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.randint(0, 1000)} tau"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)} tau"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!deposit {ck} {random.randint(0, 1000)} Tau"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)} Tau"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.randint(0, 1000)}t"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)}t"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!deposit {ck} {random.randint(0, 1000)}t"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)}t"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.randint(0, 1000)}𝜏"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)}𝜏"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!deposit {ck} {random.randint(0, 1000)}"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.randint(0, 1000)}"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
+            self.assertRaises(ValueError, get_coldkeyadd, input)
 
         # Test with floats
-        input: str = f"!withdraw {ck} {random.random() * 1000}t"
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}t"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000}"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000}𝜏"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}𝜏"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000} tao"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000} tao"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000} Tau"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000} Tau"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000} Tao"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000} Tao"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000}Tao"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}Tao"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
-        input: str = f"!withdraw {ck} {random.random() * 1000}tao"
+            self.assertRaises(ValueError, get_coldkeyadd, input)
+        input: str = f"!withdraw {ck.next()} {random.random() * 1000}tao"
         if (not is_valid_ss58_address(ck, 42)):
-            self.assertRaises(get_coldkeyadd(input), ck)
+            self.assertRaises(ValueError, get_coldkeyadd, input)
 
