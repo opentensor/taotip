@@ -235,10 +235,10 @@ class Database:
         result = self.db.addresses.update_many(query, update)
         return result.modified_count if result is not None else None
 
-    async def create_new_addr(self) -> str:
+    async def create_new_addr(self, key: bytes) -> str:
         assert self.db is not None
 
-        new_address: Address = self.api.create_address(key=config.COLDKEY_SECRET)
+        new_address: Address = self.api.create_address(key=key)
         doc: Dict = {
             "address": new_address.address,
             "mnemonic": new_address.get_encrypted_mnemonic(),

@@ -60,7 +60,7 @@ def main() -> None:
             num_addresses = len(addrs)
             if num_addresses < config.NUM_DEPOSIT_ADDRESSES:
                 for _ in tqdm(range(config.NUM_DEPOSIT_ADDRESSES - num_addresses), desc="Creating addresses..."):
-                    print(await _db.create_new_addr())
+                    print(await _db.create_new_addr(config.COLDKEY_SECRET))
         except Exception as e:
             print(e)
             print("Can't connect to db")
