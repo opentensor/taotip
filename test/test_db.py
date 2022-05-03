@@ -152,7 +152,7 @@ class TestAddressEncrypt(DBTestCase):
         self.assertNotEqual(bytes(addr_from_db.mnemonic, 'utf-8'), encrypted_mnemonic)
 
         # Decrypt mnemonic
-        dec_addr: Address = Address(addr.address, encrypted_mnemonic, key_bytes, decrypt=True)
+        dec_addr: Address = Address(addr, encrypted_mnemonic, key_bytes, decrypt=True)
         self.assertEqual(dec_addr.mnemonic, addr_from_db.mnemonic)
 
     async def test_decrypt_on_db(self):
