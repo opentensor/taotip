@@ -226,12 +226,14 @@ class API:
             balance = self.get_wallet_balance(addr["address"])
             result = await _db.update_addr_balance(addr["address"], balance.rao)
             if result is None:
-                print("Error checking deposits")
-                return []
+                print("Error checking deposits", addr["address"])
+                continue
             change, user = result
             
             if (change > 0):
                 new_transaction = Transaction(user, bittensor.Balance.from_rao(change).tao)
+                # add transaction to db
+                await new_transaction.deposit(_db)
                 new_transactions.append(new_transaction)
         return new_transactions
 

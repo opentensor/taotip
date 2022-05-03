@@ -199,13 +199,13 @@ def main() -> None:
 
             if (len(deposits) > 0):
                 for deposit in tqdm(deposits, desc="Depositing..."):
-                    new_balance = await deposit.deposit(_db)
                     if deposit.amount > 0.0:
                         try:
                             user = await client.fetch_user(deposit.user)
                         except Exception as e:
                             print(e, "main.check_deposit", "fetch_user", deposit.user)
                         if user is not None:
+                            new_balance = await _db.check_balance(deposit.user)
                             await user.send(f"Success! Deposited {deposit.amount} tao.\nYour balance is: {new_balance} tao.")
             print("Done Check")
             print("Removing old locks from deposit addresses...")
