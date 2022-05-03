@@ -16,9 +16,9 @@ class Database:
     db = None
     api: 'api.API' = None
 
-    def __init__(self, api: 'api.API', mongo_uri: str, testing: bool = False) -> None:
+    def __init__(self, mongo_client, api: 'api.API', testing: bool = False) -> None:
         self.api = api
-        self.client = pymongo.MongoClient(mongo_uri)
+        self.client = mongo_client
         database_str: str = "test" if testing else "prod"
         self.db = self.client[database_str]
 

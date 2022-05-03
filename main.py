@@ -4,18 +4,21 @@ from time import strftime
 from typing import Dict, List
 
 import discord
+import pymongo
 import pytz
 from bittensor import Balance
 from tqdm import tqdm
 from websocket import WebSocketException
 
 from src import api, config, parse, validate
-from src.db import Database, DepositException, Tip, Transaction, WithdrawException
+from src.db import (Database, DepositException, Tip, Transaction,
+                    WithdrawException)
 
 _db: Database = None
 _api: api.API = None
 
 from string import Template
+
 
 class DeltaTemplate(Template):
     delimiter = "%"
@@ -52,7 +55,7 @@ def main() -> None:
 
         try:
             mongo_uri = config.MONGO_URI_TEST if config.TESTING else config.MONGO_URI
-            _db = Database(_api, mongo_uri, config.TESTING)
+            _db = Database(pymongo.MongoClient(mongo_uri), _api, config.TESTING)
             addrs: List[str] = list(await _db.get_all_addresses())
             num_addresses = len(addrs)
             if num_addresses < config.NUM_DEPOSIT_ADDRESSES:

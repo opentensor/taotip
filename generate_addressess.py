@@ -4,6 +4,7 @@ import base64
 from hashlib import sha3_256
 from typing import List
 
+import pymongo
 from tqdm import tqdm
 from websocket import WebSocketException
 
@@ -24,7 +25,7 @@ async def generate(mongo_uri) -> None:
         exit(1)
     # Connect to the database
     try:
-        _db = db.Database(_api, mongo_uri, config.TESTING)
+        _db = db.Database(pymongo.MonogoClient(mongo_uri), _api, config.TESTING)
         addrs: List[str] = list(await _db.get_all_addresses())
         num_addresses = len(addrs)
         if num_addresses < config.NUM_DEPOSIT_ADDRESSES:
