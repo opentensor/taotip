@@ -1,7 +1,14 @@
 import re
 from . import config
-from substrateinterface.utils.ss58 import is_valid_ss58_address
+from substrateinterface.utils import ss58
 amount_check = re.compile(r'> (([1-9][0-9]*|0)(\.[0-9]*)?)\s*(' + config.CURRENCY + r'|)$')
+
+def is_valid_ss58_address(addr: str, format: int) -> bool:
+    try:
+        ss58.is_valid_ss58_address(addr, format)
+        return True
+    except IndexError as e:
+        return False
 
 def get_amount(message: str) -> float:
     """
