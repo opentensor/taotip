@@ -8,7 +8,7 @@ from bittensor import Balance
 from cryptography.fernet import Fernet
 from pymongo import ReturnDocument
 
-from . import api, config
+from . import config
 
 
 class Database:
