@@ -163,7 +163,7 @@ def main() -> None:
                     # must be withdraw
                     coldkeyadd = parse.get_coldkeyadd(message.content)
                     try:
-                        new_balance = await t.withdraw(_db, coldkeyadd)
+                        new_balance = await t.withdraw(_db, coldkeyadd, config.COLDKEY_SECRET)
                         await channel.send(f"Withdrawal successful.\nYour new balance is: {new_balance} tao")
                     except WithdrawException as e:
                         await channel.send(f"{e}")

@@ -255,7 +255,7 @@ class Database:
             print(e)
             return None
     
-    def get_address(self, addr: str) -> Dict:
+    def get_address(self, addr: str, key: bytes) -> 'Address':
         assert self.db is not None
 
         query: Dict = {
@@ -264,7 +264,7 @@ class Database:
 
         try:
             doc: Dict = self.db.addresses.find_one(query)
-            addr = Address(doc["address"], doc["mnemonic"], config.COLDKEY_SECRET, decrypt=True)
+            addr = Address(doc["address"], doc["mnemonic"], key, decrypt=True)
             return addr
         except Exception as e:
             print(e)
@@ -354,7 +354,7 @@ class Transaction:
     def __str__(self) -> str:
         return f"{self.amount} tao"
 
-    async def withdraw(self, db: Database, coldkeyadd: str) -> float:
+    async def withdraw(self, db: Database, coldkeyadd: str, key) -> float:
         if (self.amount < 0):
             raise ValueError("Amount must be positive")
 
@@ -390,7 +390,7 @@ class Transaction:
                 "amount": amount # in tao for this addr
             }
             _transaction = await db.api.create_transaction(api_transaction)
-            _signed_transaction = await db.api.sign_transaction(db, _transaction, addr)
+            _signed_transaction = await db.api.sign_transaction(db, _transaction, addr, key)
             result = db.api.send_transaction(_signed_transaction)
             if (not result):
                 raise Exception("Transaction failed", 4)

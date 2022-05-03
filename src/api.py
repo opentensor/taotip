@@ -191,8 +191,8 @@ class API:
             raise "Could not find enough tao to withdraw"
         return final_addrs, final_amts
             
-    async def sign_transaction(self, _db: Database, transaction: Dict, addr: str) -> Dict:
-        doc: Address = _db.get_address(addr)
+    async def sign_transaction(self, _db: Database, transaction: Dict, addr: str, key: bytes) -> Dict:
+        doc: Address = _db.get_address(addr, key)
         if (not doc):
             raise Exception('address not found')
         mnemonic: str = doc.mnemonic
