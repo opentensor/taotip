@@ -1,4 +1,6 @@
 from binascii import hexlify
+from random import random
+import bittensor
 import mongomock
 import unittest
 from ..src import api, db, config
@@ -157,3 +159,33 @@ class TestAddressEncrypt(DBTestCase):
             'encrypted_mnemonic': addr.get_encrypted_mnemonic()
         })
         self.assertEqual(self._db.db.addresses.find_one({'address': addr.address})['mnemonic'], addr.mnemonic)        
+
+class TestBalanceChange(DBTestCase):
+    async def test_check_balance(self):
+        # Create user with balance
+        user_id = random.randint(0, 1000000)
+        bal = random.randint(0, 1000000)
+        self._db.db.balances.insert_one({
+            'discord_use': user_id,
+            'balance': bal
+        })
+
+        # Check balance
+        self.assertEqual(await self._db.check_balance(user_id), bal)
+    
+    async def test_update_balance(self):
+        # Create user with balance
+        user_id = random.randint(0, 1000000)
+        bal = random.randint(0, 1000000)
+        self._db.db.balances.insert_one({
+            'discord_use': user_id,
+            'balance': bal
+        })
+
+        # Check balance
+        self.assertEqual(await self._db.check_balance(user_id), bal)
+        # Update balance
+        update_amount = random.random() * 1000 # Random float between 0 and 1000
+        bal_new: bittensor.Balance = bittensor.Balance.from_rao(bal) + bittensor.Balance.from_float(update_amount)
+        await self._db.update_balance(user_id, update_amount)
+        self.assertEqual(await self._db.check_balance(user_id), bal_new.to_rao())
