@@ -158,7 +158,7 @@ class API:
         withdraw_addrs: List[str] = await _db.get_withdraw_addresses()
         if not withdraw_addrs:
             print ("No withdraw addresses found")
-            raise Exception('no withdraw addresses found')
+            raise WithdrawException("User:" + transaction.user, transaction.amount, 'No withdraw addresses found')
 
         withdraw_addrs = [addr['address'] for addr in withdraw_addrs]
         for addr in withdraw_addrs:
