@@ -28,4 +28,3 @@ class TestSendTransaction(DBTestCase):
 
     def test_check_balance_after_transaction(self):
         pass
-    

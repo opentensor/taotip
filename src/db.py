@@ -173,7 +173,7 @@ class Database:
         self.db.addresses.update_one(_query, update)
         return None
 
-    async def get_deposit_addr(self, transaction) -> str:
+    async def get_deposit_addr(self, transaction: 'Transaction') -> str:
         assert self.db is not None
 
         # check if already has an address

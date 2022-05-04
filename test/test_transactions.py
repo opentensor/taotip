@@ -1,7 +1,7 @@
 import random
 from types import SimpleNamespace
-from typing import Dict
-from unittest.mock import MagicMock
+from typing import Dict, List, Set
+from unittest.mock import MagicMock, patch
 
 import bittensor
 from cryptography.fernet import Fernet
@@ -11,21 +11,131 @@ from substrateinterface import Keypair
 from ..src import api, db
 from .test_db import DBTestCase
 
-"""
-Test depositing funds while mocking the blockchain. 
-Tests DB functions and some API functions.
-"""
+
 class TestDeposit(DBTestCase):
-    def test_deposit_with_zero_balance(self):
+    """
+    Test depositing funds while mocking the blockchain. 
+    Tests DB functions and some API functions.
+    """
+    _api: api.API
+    _db: db.Database
+
+    async def test_deposit_with_zero_balance(self):
         # Create new user with zero balance
-        pass
+        user: int = random.randint(0, 1000000)
+        amount_: float = random.random() * 1000 + 2.0
+        amount_ = round(amount_, 6)
+        amount: bittensor.Balance = bittensor.Balance.from_float(amount_)
+        # Insert balance doc into db, with 0 balance
+        self._db.db.balances.insert_one({
+            'discord_user': user,
+            'balance': 0
+        })
 
-    def test_deposit_with_nonzero_balance(self):
-        pass
+        # Form transaction
+        transaction: db.Transaction = db.Transaction(
+            user=user,
+            amount=amount.tao
+        )
 
-    def test_deposit_with_no_balance_doc(self):
+        # Deposit funds
+        new_balance: float = await transaction.deposit(self._db)
+        # Check balance
+        balance: float = await self._db.check_balance(user)
+        self.assertEqual(balance, amount.tao)
+        self.assertEqual(new_balance, amount.tao)
+        # Check balance in db
+        balance_doc: Dict = self._db.db.balances.find_one({
+            'discord_user': user
+        })
+        self.assertEqual(balance_doc['balance'], amount.rao)
+        # Check balance in db
+        # Check transaction doc
+        transaction_doc: db.Transaction = self._db.db.transactions.find_one({
+            'user': user
+        })
+
+        self.assertIsNotNone(transaction_doc)
+        self.assertEqual(transaction_doc['user'], user)
+        self.assertEqual(transaction_doc['amount'], amount.rao)  
+
+    async def test_deposit_with_nonzero_balance(self):
+        # Create new user with nonzero balance
+        user: int = random.randint(0, 1000000)
+        user_bal_: float = random.random() * 1000 + 2.0
+        user_bal: bittensor.Balance = bittensor.Balance.from_float(user_bal_)
+        amount_: float = random.random() * 1000 + 2.0
+        amount: bittensor.Balance = bittensor.Balance.from_float(amount_)
+        expected_bal = user_bal + amount
+        # Insert balance doc into db, with 0 balance
+        self._db.db.balances.insert_one({
+            'discord_user': user,
+            'balance': user_bal.rao
+        })
+
+        # Form transaction
+        transaction: db.Transaction = db.Transaction(
+            user=user,
+            amount=amount.tao
+        )
+
+        # Deposit funds
+        new_balance: float = await transaction.deposit(self._db)
+        # Check balance
+        balance: float = await self._db.check_balance(user)
+        self.assertEqual(balance, expected_bal.tao)
+        self.assertEqual(new_balance, expected_bal.tao)
+        # Check balance in db
+        balance_doc: Dict = self._db.db.balances.find_one({
+            'discord_user': user
+        })
+        self.assertEqual(balance_doc['balance'], expected_bal.rao)
+        # Check balance in db
+        # Check transaction doc
+        transaction_doc: db.Transaction = self._db.db.transactions.find_one({
+            'user': user
+        })
+
+        self.assertIsNotNone(transaction_doc)
+        self.assertEqual(transaction_doc['user'], user)
+        self.assertEqual(transaction_doc['amount'], amount.rao)
+
+    async def test_deposit_with_no_balance_doc(self):
         # New user would have no balance doc in db
-        pass
+        # Create new user with zero balance
+        user: int = random.randint(0, 1000000)
+        amount_: float = random.random() * 1000 + 2.0
+        amount_ = round(amount_, 6)
+        amount: bittensor.Balance = bittensor.Balance.from_float(amount_)
+
+        # No balance doc in db
+
+        # Form transaction
+        transaction: db.Transaction = db.Transaction(
+            user=user,
+            amount=amount.tao
+        )
+
+        # Deposit funds
+        new_balance: float = await transaction.deposit(self._db)
+        # Check balance
+        balance: float = await self._db.check_balance(user)
+        self.assertEqual(balance, amount.tao)
+        self.assertEqual(new_balance, amount.tao)
+        # Check balance in db
+        balance_doc: Dict = self._db.db.balances.find_one({
+            'discord_user': user
+        })
+        self.assertEqual(balance_doc['balance'], amount.rao)
+        # Check balance in db
+        # Check transaction doc
+        transaction_doc: db.Transaction = self._db.db.transactions.find_one({
+            'user': user
+        })
+
+        self.assertIsNotNone(transaction_doc)
+        self.assertEqual(transaction_doc['user'], user)
+        self.assertEqual(transaction_doc['amount'], amount.rao)  
 
     def test_deposit_outside_expiry(self):
         pass
@@ -36,8 +146,58 @@ class TestDeposit(DBTestCase):
     def test_deposit_no_addresses(self):
         pass
 
-    def test_check_for_deposits(self):
-        pass
+    async def test_check_for_deposits(self):
+        key_bytes: bytes = Fernet.generate_key()
+        # Check deposits with no deposits
+        deposits: List[db.Transaction] = await self._api.check_for_deposits(self._db)
+        self.assertEqual(deposits, [])
+
+        # Create 3 addresses
+        addresses: List[str] = []
+        new_balances: Dict[str, bittensor.Balance] = {}
+        for _ in range(3):
+            addresses.append(await self._db.create_new_addr(key_bytes))
+            # Update address doc in db, with 0 balance
+            self._db.db.addresses.update_one({
+                'address': addresses[-1]
+            }, {
+                '$set': {
+                    'balance': 0
+                }
+            })
+            new_balances[addresses[-1]] = bittensor.Balance.from_float(random.random() * 1000 + 2.0)
+        
+        # Check deposits with no deposits
+        deposits: List[db.Transaction] = await self._api.check_for_deposits(self._db)
+        self.assertEqual(deposits, [])
+    
+        def mock_get_balance(address: str) -> bittensor.Balance:
+            return new_balances[address]
+
+        with patch('bittensor.Subtensor.get_balance', side_effect=mock_get_balance):
+            # Simulate deposits
+            users = [
+                random.randint(0, 1000000),
+                random.randint(0, 1000000),
+                random.randint(0, 1000000)
+            ]
+            addrs_for_users: Dict[int, str] = {}
+            for user in users:
+                transaction: db.Transaction = db.Transaction(
+                    user=user,
+                    amount=new_balances[addresses[0]].tao
+                )
+                addr_for_user: str = await self._db.get_deposit_addr(transaction)
+                self.assertIsNotNone(addr_for_user)
+                addrs_for_users[user] = addr_for_user
+
+            # Check deposits
+            deposits: List[db.Transaction] = await self._api.check_for_deposits(self._db)
+            for deposit in deposits:
+                self.assertIn(deposit.user, users)      
+                addr_: str = addrs_for_users[deposit.user]          
+                self.assertEqual(deposit.amount, new_balances[addr_].tao)
+
 
     def test_check_for_deposits_with_no_addresses(self):
         pass
@@ -45,11 +205,41 @@ class TestDeposit(DBTestCase):
     def test_check_for_deposits_with_no_deposits(self):
         pass
 
-"""
-Test withdrawing funds while mocking the blockchain. 
-Tests DB functions and some API functions.
-"""
+    async def test_get_deposit_addresses(self):
+        key_bytes: bytes = Fernet.generate_key()
+        # Create a few new addresess
+        addresses: Set[str] = set()
+        for _ in range(0, 10):
+            addr: str = await self._db.create_new_addr(key_bytes)
+            addresses.add(addr)
+
+        # Get addresses
+        ## Each address should be in the set
+        ## Only one address per unique user
+        seen_addr: Set[str] = set()
+        users = set()
+        for _ in range(0, 10):
+            # Create new user
+            user: int = random.randint(0, 1000000)
+            while user in users:
+                user = random.randint(0, 1000000)
+            users.add(user)
+
+            # Form transaction
+            transaction: db.Transaction = db.Transaction(
+                user=user,
+                amount=0
+            )
+            deposit_addr: Set[str] = await self._db.get_deposit_addr(transaction)
+            seen_addr.add(deposit_addr)
+
+        self.assertEqual(seen_addr, addresses)
+
 class TestWithdraw(DBTestCase):
+    """ Test withdrawing funds while mocking the blockchain. 
+    Tests DB functions and some API functions.
+    """
+
     _api: api.API
     _db: db.Database
 
@@ -185,29 +375,28 @@ class TestWithdraw(DBTestCase):
         })
 
         # Setup mock balance check
-        self._api.subtensor.get_balance = MagicMock(return_value=addr_bal)
+        with patch('bittensor.Subtensor.get_balance', return_value=addr_bal):
+            # Create transaction
+            transaction: Dict = {
+                'coldkeyadd': addr,
+                'amount': amount,
+                'dest': '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
+            }
+            transaction: db.Transaction = await self._api.create_transaction(transaction)
 
-        # Create transaction
-        transaction: Dict = {
-            'coldkeyadd': addr,
-            'amount': amount,
-            'dest': '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-        }
-        transaction: db.Transaction = await self._api.create_transaction(transaction)
-
-        signed_transaction: Dict = await self._api.sign_transaction(self._db, transaction, addr, key=key_bytes)
-        """{
-            "signature": "0x" + signature.hex(),
-            "call": transaction["call"],
-            "coldkeyadd": addr,
-            "signature_payload_hex": signature_payload_hex
-        }"""
-        key: Keypair = Keypair(ss58_address=addr)
-        self.assertTrue(key.verify(
-            ScaleBytes(signed_transaction['signature_payload_hex']),
-            signed_transaction['signature']
-        ))
-        self.assertEqual(signed_transaction['coldkeyadd'], addr)
+            signed_transaction: Dict = await self._api.sign_transaction(self._db, transaction, addr, key=key_bytes)
+            """{
+                "signature": "0x" + signature.hex(),
+                "call": transaction["call"],
+                "coldkeyadd": addr,
+                "signature_payload_hex": signature_payload_hex
+            }"""
+            key: Keypair = Keypair(ss58_address=addr)
+            self.assertTrue(key.verify(
+                ScaleBytes(signed_transaction['signature_payload_hex']),
+                signed_transaction['signature']
+            ))
+            self.assertEqual(signed_transaction['coldkeyadd'], addr)
 
     async def test_withdraw_success(self):
         user: int = random.randint(0, 1000000)
@@ -249,30 +438,29 @@ class TestWithdraw(DBTestCase):
 
         # Setup mock balance check
         ## Check for get withdraw addr, check for send, check for get after send
-        self._api.subtensor.get_balance = MagicMock(side_effect=[
+        with patch('bittensor.Subtensor.get_balance', side_effect=[
             addr_balance, addr_balance, expected_addr_balance
-        ])
-        # Setup mock send transaction
-        mock_response: SimpleNamespace = SimpleNamespace(
-            process_events=MagicMock(return_value=None),
-            is_success=True
-        )
-        self._api.subtensor.substrate.submit_extrinsic = MagicMock(return_value=mock_response)
+        ]):       
+            # Setup mock send transaction
+            mock_response: SimpleNamespace = SimpleNamespace(
+                process_events=MagicMock(return_value=None),
+                is_success=True
+            )
+            with patch('substrateinterface.SubstrateInterface.submit_extrinsic', MagicMock(return_value=mock_response)):
+                # Attempt to withdraw
+                coldkeyadd: str = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
+                ## Create Transaction
+                transaction: db.Transaction = db.Transaction(user, amount)
+                new_balance: float = await transaction.withdraw(self._db, coldkeyadd, key_bytes)
+                new_balance = bittensor.Balance.from_float(new_balance)
+                # Check that the balance is correct
+                expected_balance: bittensor.Balance = user_bal - bittensor.Balance.from_float((await self._api.get_withdraw_fee()) + amount)
+                self.assertEqual(new_balance, expected_balance)
 
-        # Attempt to withdraw
-        coldkeyadd: str = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
-        ## Create Transaction
-        transaction: db.Transaction = db.Transaction(user, amount)
-        new_balance: float = await transaction.withdraw(self._db, coldkeyadd, key_bytes)
-        new_balance = bittensor.Balance.from_float(new_balance)
-        # Check that the balance is correct
-        expected_balance: bittensor.Balance = user_bal - bittensor.Balance.from_float((await self._api.get_withdraw_fee()) + amount)
-        self.assertEqual(new_balance, expected_balance)
+                # Check that balance is in db
+                balance: float = await self._db.check_balance(user)
+                self.assertEqual(balance, expected_balance.tao)
 
-        # Check that balance is in db
-        balance: float = await self._db.check_balance(user)
-        self.assertEqual(balance, expected_balance.tao)
-
-        # Check that addr balance is in db
-        addr_db: Dict = self._db.db.addresses.find_one({'address': addr})
-        self.assertEqual(addr_db['balance'], expected_addr_balance.rao)
+                # Check that addr balance is in db
+                addr_db: Dict = self._db.db.addresses.find_one({'address': addr})
+                self.assertEqual(addr_db['balance'], expected_addr_balance.rao)
