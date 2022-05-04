@@ -88,13 +88,13 @@ class API:
         dest = transaction["dest"]
 
         if (not coldkeyadd):
-            raise 'specify coldkeyadd'
+            raise Exception('specify coldkeyadd')
 
         if (not amount or (not isinstance(amount, float) and not isinstance(amount, int) and not amount.isnumeric())):
-            raise 'specify amount'
+            raise Exception('specify amount')
 
         if (not dest):
-            raise 'specify destination address dest'
+            raise Exception('specify destination address dest')
 
         # converts to balance given tao (float)
         if (isinstance(amount, float)):
@@ -104,7 +104,7 @@ class API:
         
         balance = self.get_wallet_balance(coldkeyadd)
         if (balance < amount):
-            raise 'insufficient balance'
+            raise Exception('insufficient balance')
         try:
             call, signature_payload, paymentInfo = self.init_transaction(coldkeyadd, dest, amount)
             return {
