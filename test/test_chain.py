@@ -74,6 +74,3 @@ class TestSendTransaction(DBTestCase):
                     coldkeyadd="totallyinvalidaddress"
                 )
             self.assertEqual("invalid coldkey address coldkeyadd", str(e.exception))
-
-    def test_check_balance_after_transaction(self):
-        pass
