@@ -7,7 +7,7 @@ import asyncio
 import pytest
 from cryptography.fernet import Fernet
 from ..src import api, db, parse
-from ..src.db import Address
+from ..src.db import Address, Tip
 
 class DBTestCase(unittest.IsolatedAsyncioTestCase):
     @classmethod
@@ -211,3 +211,289 @@ class TestAddressCreate(DBTestCase):
         self.assertIsNotNone(mnemonic)
         unenc_mnemonic: str = Address(addr, enc_address['mnemonic'], key_bytes, decrypt=True).mnemonic
         self.assertEqual(unenc_mnemonic, mnemonic)
+
+class TestTips(DBTestCase):
+    async def test_tip_create(self):
+        # Create user with balance
+        sender = random.randint(0, 1000000)
+        recipient = random.randint(0, 1000000)
+        amount = random.random() * 1000 + 1.0# Random float between 1 and 1001
+
+        tip: Tip = Tip(sender, recipient, amount)
+        self.assertEqual(tip.sender, sender)
+        self.assertEqual(tip.recipient, recipient)
+        self.assertEqual(tip.amount, amount)
+
+        self.assertEqual(str(tip), f'{sender} -> {recipient} ({amount}) tao')
+
+        # Insert tip in db
+        await self._db.record_tip(tip)
+
+        # Check if tip is in db
+        tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
+        self.assertEqual(tip_from_db['sender'], sender)
+        self.assertEqual(tip_from_db['recipient'], recipient)
+        self.assertEqual(
+            bittensor.Balance.from_rao(tip_from_db['amount']),
+            bittensor.Balance.from_float(amount)
+        )
+        ## Timestamp on mongo loses some precision
+        self.assertAlmostEqual(tip_from_db['time'].timestamp(), tip.time.timestamp(), delta=0.001)
+
+    async def test_tip_sent(self):
+        # Create user with balance
+        sender = random.randint(0, 1000000)
+        recipient = random.randint(0, 1000000)
+        amount: float = random.random() * 1000 + 1.0 # Random float between 1 and 1001
+        bal: int = random.randint(0, 100000000000) + bittensor.Balance.from_float(amount).rao
+        # Insert user in db
+        self._db.db.balances.insert_one({
+            'discord_user': sender,
+            'balance': bal
+        })
+
+        # Check balance
+        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
+        # Tip user
+        tip: Tip = Tip(sender, recipient, amount)
+        ## Send tip
+        await tip.send(self._db)
+
+        # Check balance
+        balance_new_expected: bittensor.Balance = bittensor.Balance.from_rao(bal) - bittensor.Balance.from_float(amount)
+        self.assertEqual(await self._db.check_balance(sender), balance_new_expected.tao)    
+
+        # Check balance using db
+        balance_db: int = self._db.db.balances.find_one({'discord_user': sender})['balance']
+        self.assertEqual(balance_db, balance_new_expected.rao)
+
+        # Check if tip is in db
+        tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
+        self.assertEqual(tip_from_db['sender'], sender)
+        self.assertEqual(tip_from_db['recipient'], recipient)
+        self.assertEqual(
+            bittensor.Balance.from_rao(tip_from_db['amount']),
+            bittensor.Balance.from_float(amount)
+        )
+        ## Timestamp on mongo loses some precision
+        self.assertAlmostEqual(tip_from_db['time'].timestamp(), tip.time.timestamp(), delta=0.001)
+
+    async def test_tip_received_no_recipient_balance(self):
+        # Create sender with balance
+        sender = random.randint(0, 1000000)
+        recipient = random.randint(0, 1000000)
+        amount: float = random.random() * 1000 + 1
+        bal: int = random.randint(0, 100000000000) + bittensor.Balance.from_float(amount).rao
+        # Insert user in db
+        self._db.db.balances.insert_one({
+            'discord_user': sender,
+            'balance': bal
+        })
+
+        # Check balance
+        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
+        # Tip user
+        tip: Tip = Tip(sender, recipient, amount)
+        ## Send tip
+        await tip.send(self._db)
+
+        # Check balance of recipient
+        balance_new_expected: bittensor.Balance = bittensor.Balance.from_float(amount)
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected.tao)    
+
+        # Check balance using db
+        balance_db: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']
+        self.assertEqual(balance_db, balance_new_expected.rao)
+
+        # Check if tip is in db
+        tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
+        self.assertEqual(tip_from_db['sender'], sender)
+        self.assertEqual(tip_from_db['recipient'], recipient)
+        self.assertEqual(
+            bittensor.Balance.from_rao(tip_from_db['amount']),
+            bittensor.Balance.from_float(amount)
+        )
+        ## Timestamp on mongo loses some precision
+        self.assertAlmostEqual(tip_from_db['time'].timestamp(), tip.time.timestamp(), delta=0.001)
+
+    async def test_tip_received_recipient_has_balance(self):
+        # Create sender with balance
+        sender = random.randint(0, 1000000)
+        recipient = random.randint(0, 1000000)
+        amount: float = random.random() * 1000 + 1
+        bal: int = random.randint(0, 100000000000) + bittensor.Balance.from_float(amount).rao
+        # Insert user in db
+        self._db.db.balances.insert_one({
+            'discord_user': sender,
+            'balance': bal
+        })
+
+        # Insert recipient with balance
+        recipient_bal: int = random.randint(0, 100000000000)
+        self._db.db.balances.insert_one({
+            'discord_user': recipient,
+            'balance': recipient_bal
+        })
+
+        # Check balance
+        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
+        self.assertEqual(await self._db.check_balance(recipient), bittensor.Balance.from_rao(recipient_bal).tao)
+        # Tip user
+        tip: Tip = Tip(sender, recipient, amount)
+        ## Send tip
+        await tip.send(self._db)
+
+        # Check balance of recipient
+        balance_new_expected: bittensor.Balance = bittensor.Balance.from_float(amount) + bittensor.Balance.from_rao(recipient_bal)
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected.tao)
+
+        # Check balance using db
+        balance_db: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']
+        self.assertEqual(balance_db, balance_new_expected.rao)
+
+        # Check if tip is in db
+        tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
+        self.assertEqual(tip_from_db['sender'], sender)
+        self.assertEqual(tip_from_db['recipient'], recipient)
+        self.assertEqual(
+            bittensor.Balance.from_rao(tip_from_db['amount']),
+            bittensor.Balance.from_float(amount)
+        )
+        ## Timestamp on mongo loses some precision
+        self.assertAlmostEqual(tip_from_db['time'].timestamp(), tip.time.timestamp(), delta=0.001)
+
+    async def test_tip_not_enough_balance(self):
+        # Create sender with balance
+        sender = random.randint(0, 1000000)
+        recipient = random.randint(0, 1000000)
+        amount: float = random.random() * 1000 + 2
+        bal: int = bittensor.Balance.from_float(amount).rao - random.randint(1, 100)
+        bal = bal if bal > 0 else 1 # Ensure balance is positive
+        # Insert user in db
+        self._db.db.balances.insert_one({
+            'discord_user': sender,
+            'balance': bal
+        })
+
+        # Insert recipient with balance
+        recipient_bal: int = random.randint(0, 100000000000)
+        self._db.db.balances.insert_one({
+            'discord_user': recipient,
+            'balance': recipient_bal
+        })
+
+        # Check balance
+        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
+        # Tip user
+        tip: Tip = Tip(sender, recipient, amount)
+        ## Send tip
+        await tip.send(self._db)
+
+        # Tip should fail
+
+        # Check balance of sender
+        balance_new_expected_sender: bittensor.Balance = bittensor.Balance.from_rao(bal)
+        self.assertEqual(await self._db.check_balance(sender), balance_new_expected_sender.tao)
+        
+        # Check balance using db
+        balance_db_sender: int = self._db.db.balances.find_one({'discord_user': sender})['balance']
+        self.assertEqual(balance_db_sender, balance_new_expected_sender.rao)
+
+        # Check balance of recipient. Should be unchanged
+        balance_new_expected_rec: bittensor.Balance = bittensor.Balance.from_rao(recipient_bal)
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected_rec.tao)    
+
+        # Check balance using db
+        balance_db_rec: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']
+        self.assertEqual(balance_db_rec, balance_new_expected_rec.rao)
+
+        # Check if tip is in db
+        tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
+        self.assertIsNone(tip_from_db)
+
+    async def test_tip_no_balance(self):
+        # Create sender with balance
+        sender = random.randint(0, 1000000)
+        recipient = random.randint(0, 1000000)
+        amount: float = random.random() * 1000 + 1
+        bal: int = 0
+        # Insert user in db
+        self._db.db.balances.insert_one({
+            'discord_user': sender,
+            'balance': bal
+        })
+
+        # Insert recipient with balance
+        recipient_bal: int = random.randint(0, 100000000000)
+        self._db.db.balances.insert_one({
+            'discord_user': recipient,
+            'balance': recipient_bal
+        })
+
+        # Check balance
+        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
+        # Tip user
+        tip: Tip = Tip(sender, recipient, amount)
+        ## Send tip
+        await tip.send(self._db)
+
+        # Tip should fail
+
+        # Check balance of sender
+        balance_new_expected_sender: bittensor.Balance = bittensor.Balance.from_rao(bal)
+        self.assertEqual(await self._db.check_balance(sender), balance_new_expected_sender.tao)
+        
+        # Check balance using db
+        balance_db_sender: int = self._db.db.balances.find_one({'discord_user': sender})['balance']
+        self.assertEqual(balance_db_sender, balance_new_expected_sender.rao)
+
+        # Check balance of recipient. Should be unchanged
+        balance_new_expected_rec: bittensor.Balance = bittensor.Balance.from_rao(recipient_bal)
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected_rec.tao)    
+
+        # Check balance using db
+        balance_db_rec: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']
+        self.assertEqual(balance_db_rec, balance_new_expected_rec.rao)
+
+        # Check if tip is in db
+        tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
+        self.assertIsNone(tip_from_db)
+
+    async def test_tip_no_sender_in_db(self):
+        # Create sender with balance
+        sender = random.randint(0, 1000000)
+        recipient = random.randint(0, 1000000)
+        amount: float = random.random() * 1000 + 1
+
+        # Insert recipient with balance
+        recipient_bal: int = random.randint(0, 100000000000)
+        self._db.db.balances.insert_one({
+            'discord_user': recipient,
+            'balance': recipient_bal
+        })
+
+        # Tip user
+        tip: Tip = Tip(sender, recipient, amount)
+        ## Send tip
+        await tip.send(self._db)
+
+        # Tip should fail
+
+        # Check balance of sender
+        self.assertEqual(await self._db.check_balance(sender), 0.0)
+        
+        # Check balance using db
+        db_sender: int = self._db.db.balances.find_one({'discord_user': sender})
+        self.assertIsNone(db_sender, 'User should not be in db')
+
+        # Check balance of recipient. Should be unchanged
+        balance_new_expected_rec: bittensor.Balance = bittensor.Balance.from_rao(recipient_bal)
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected_rec.tao)    
+
+        # Check balance using db
+        balance_db_rec: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']
+        self.assertEqual(balance_db_rec, balance_new_expected_rec.rao)
+
+        # Check if tip is in db
+        tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
+        self.assertIsNone(tip_from_db, 'Tip should not be in db')
