@@ -302,10 +302,10 @@ class Database:
             return None
 
 class Tip:
-    time: datetime
-    amount: float
-    sender: str
-    recipient: str
+    time: datetime = None
+    amount: float = None
+    sender: str = None
+    recipient: str = None
 
     def __init__(self, sender:str, recipient: str, amount: int, time: datetime = datetime.now()) -> None:
         self.amount = amount
@@ -314,7 +314,7 @@ class Tip:
         self.time = time
 
     def __str__(self) -> str:
-        return f"{self.amount} tao"
+        return f"{self.sender} -> {self.recipient} ({self.amount}) tao"
 
     async def send(self, db: Database) -> bool:
         if (self.amount < 0 or self.sender == self.recipient):
