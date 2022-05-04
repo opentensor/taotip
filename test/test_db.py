@@ -6,7 +6,7 @@ import unittest
 import asyncio
 import pytest
 from cryptography.fernet import Fernet
-from ..src import api, db
+from ..src import api, db, parse
 from ..src.db import Address
 
 class DBTestCase(unittest.IsolatedAsyncioTestCase):
@@ -194,3 +194,20 @@ class TestBalanceChange(DBTestCase):
         bal_new: bittensor.Balance = bittensor.Balance.from_rao(bal) + bittensor.Balance.from_float(update_amount)
         await self._db.update_balance(user_id, update_amount)
         self.assertEqual(await self._db.check_balance(user_id), bal_new.tao)
+
+class TestAddressCreate(DBTestCase):
+    async def test_create_address(self):
+        key_bytes: bytes = Fernet.generate_key()
+        addr: str = await self._db.create_new_addr(key=key_bytes)
+        self.assertIsNotNone(addr)
+        self.assertTrue(parse.is_valid_ss58_address(addr, 42)) #bittensor ss58 format
+
+        # Check if address is in db
+        enc_address: Address = self._db.db.addresses.find_one({'address': addr})
+        self.assertEqual(enc_address['address'], addr)
+        # Check if mnemonic can be decrypted
+        unenc_address: Address = self._db.get_address(addr, key=key_bytes)
+        mnemonic: str = unenc_address.mnemonic
+        self.assertIsNotNone(mnemonic)
+        unenc_mnemonic: str = Address(addr, enc_address['mnemonic'], key_bytes, decrypt=True).mnemonic
+        self.assertEqual(unenc_mnemonic, mnemonic)
