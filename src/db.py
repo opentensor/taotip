@@ -372,16 +372,11 @@ class Transaction:
         if (balance < self.amount + withdraw_fee):
             raise WithdrawException(coldkeyadd, self.amount, "Balance too low to withdraw")
         self.fee = withdraw_fee
+       
+        withdraw_addr, amounts = await db.api.find_withdraw_address(db, self)
 
-        try:           
-            new_balance = await db.update_balance(self.user, -self.amount + -self.fee)
-            await db.record_transaction(self)
-
-            withdraw_addr, amounts = await db.api.find_withdraw_address(db, self)
-
-        except Exception as e:
-            print(e, "db.withdraw")
-            raise Exception("Withdraw error; Not enough tao in wallets")
+        new_balance = await db.update_balance(self.user, -self.amount + -self.fee)
+        await db.record_transaction(self)
 
         for addr, amount in zip(withdraw_addr, amounts):
             api_transaction = {
