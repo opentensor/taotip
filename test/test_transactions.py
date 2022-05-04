@@ -198,7 +198,6 @@ class TestDeposit(DBTestCase):
                 addr_: str = addrs_for_users[deposit.user]          
                 self.assertEqual(deposit.amount, new_balances[addr_].tao)
 
-
     def test_check_for_deposits_with_no_addresses(self):
         pass
 

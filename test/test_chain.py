@@ -1,7 +1,7 @@
 import random
 from types import SimpleNamespace
 from typing import Dict
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock,patch
 
 import bittensor
 from cryptography.fernet import Fernet
@@ -17,14 +17,63 @@ class TestSendTransaction(DBTestCase):
     _api: api.API
     _db: db.Database
     
-    def test_send_transaction(self):
-        pass
-
+    async def test_send_transaction(self):
+        mock_response: SimpleNamespace = SimpleNamespace(
+                process_events=MagicMock(return_value=None),
+                is_success=True
+        )
+        amount: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 2)
+        with patch('substrateinterface.SubstrateInterface.query', return_value=SimpleNamespace(
+            value = {
+                'data': {
+                    'free': amount.rao,
+                }
+            }
+        )):
+            with patch('substrateinterface.SubstrateInterface.submit_extrinsic', return_value=mock_response):
+                key_bytes = Fernet.generate_key()
+                addr: str = await self._db.create_new_addr(key_bytes) 
+                dest_addr: db.Address = self._api.create_address(Fernet.generate_key())
+                
+                api_transaction = {
+                    "coldkeyadd": addr,
+                    "dest": dest_addr.address,
+                    "amount": amount.tao # in tao for this addr
+                }
+                _transaction = await self._api.create_transaction(api_transaction)
+                _signed_transaction = await self._api.sign_transaction(self._db, _transaction, addr, key_bytes)
+                result = self._api.send_transaction(_signed_transaction)
+                self.assertEqual(result['message'], "Transaction sent")
+                self.assertEqual(result['response'], mock_response)
+            
     def test_check_balance(self):
-        pass
+        key_bytes = Fernet.generate_key()
+        addr: db.Address = self._api.create_address(key_bytes)
+        bal: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 2)
+        with patch('substrateinterface.SubstrateInterface.query', return_value=SimpleNamespace(
+            value = {
+                'data': {
+                    'free': bal.rao,
+                }
+            }
+        )):
+            self.assertEqual(self._api.get_wallet_balance(addr.address), bal)
 
     def test_check_balance_with_invalid_address(self):
-        pass
+        key_bytes = Fernet.generate_key()
+        bal: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 2)
+        with patch('substrateinterface.SubstrateInterface.query', return_value=SimpleNamespace(
+            value = {
+                'data': {
+                    'free': bal.rao,
+                }
+            }
+        )):
+            with self.assertRaises(Exception) as e:
+                self._api.get_wallet_balance(
+                    coldkeyadd="totallyinvalidaddress"
+                )
+            self.assertEqual("invalid coldkey address coldkeyadd", str(e.exception))
 
     def test_check_balance_after_transaction(self):
         pass
