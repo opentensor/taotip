@@ -1,24 +1,39 @@
+import unittest
 from ..src.validate import is_valid_format
 import random
 
-def test_is_valid_format():
-    test_str_plain = "!tip <@!274877908992> 100"
-    assert is_valid_format(test_str_plain)
-    test_str_plain_no_space = "!tip <@!274877908992>100"
-    assert not is_valid_format(test_str_plain_no_space)
-    test_str_tao = "!tip <@!274877908992> 1 tao"
-    assert is_valid_format(test_str_tao)
-    test_str_tao = "!tip <@!274877908992> 1 tao"
-    assert is_valid_format(test_str_tao)
-    test_str_tao_no_space = "!tip <@!274877908992>1tao"
-    assert not is_valid_format(test_str_tao_no_space)
-    test_str_tao_no_space = "!tip <@!274877908992>1tao"
-    assert not is_valid_format(test_str_tao_no_space)
-    test_str_random_usr = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> 1"
-    assert is_valid_format(test_str_random_usr)
-    test_str_float = "!tip <@!274877908992> 1.5"
-    assert is_valid_format(test_str_float)
-    test_str_float_no_decimal = "!tip <@!274877908992> 1."
-    assert is_valid_format(test_str_float_no_decimal)
+class TestValidate(unittest.TestCase):
+    def test_is_valid_tip(self):
+        test_str_plain = "!tip <@!274877908992> 100"
+        assert is_valid_format(test_str_plain)
+        test_str_plain_no_space = "!tip <@!274877908992>100"
+        assert not is_valid_format(test_str_plain_no_space)
+        test_str_tao = "!tip <@!274877908992> 1 tao"
+        assert is_valid_format(test_str_tao)
+        test_str_tao = "!tip <@!274877908992> 1 tao"
+        assert is_valid_format(test_str_tao)
+        test_str_tao_no_space = "!tip <@!274877908992>1tao"
+        assert not is_valid_format(test_str_tao_no_space)
+        test_str_tao_no_space = "!tip <@!274877908992>1tao"
+        assert not is_valid_format(test_str_tao_no_space)
+        test_str_random_usr = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> 1"
+        assert is_valid_format(test_str_random_usr)
+        test_str_float = "!tip <@!274877908992> 1.5"
+        assert is_valid_format(test_str_float)
+        test_str_float_no_decimal = "!tip <@!274877908992> 1."
+        assert is_valid_format(test_str_float_no_decimal)
     
+    def test_is_valid_deposit(self):
+        pass
 
+    def test_is_valid_withdraw(self):
+        pass
+
+    def test_is_valid_balance(self):
+        pass
+
+    def test_is_valid_help(self):
+        pass
+
+    def test_is_valid_deposit_or_withdraw(self):
+        pass

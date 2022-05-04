@@ -36,7 +36,6 @@ class TestGetAmount(unittest.TestCase):
         amount = random.random() * 100000
         input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> {amount} tao"
         self.assertEqual(get_amount(input), amount)
-
     
     def test_get_amount_fail(self):
         # Test invalid input
