@@ -3,11 +3,10 @@ CURRENCY = r'tao|t|tau|Tao|Tau|𝜏'
 PROMPT = '!tip'
 MONGO_URI="mongodb://taotip:prod_pass@mongodb:27017/prod?retryWrites=true&w=majority"
 MONGO_URI_TEST="mongodb://taotip:taotip@mongodb:27017/test?retryWrites=true&w=majority"
-BAL_PROMPT="(!balance)|(!bal)"
-DEP_PROMPT=f"!deposit ([1-9][0-9]*|0)(\.|\.[0-9]+)?\s*({CURRENCY}|)?"
+BAL_PROMPT="!balance|!bal"
+DEP_PROMPT=f"!deposit"
 WIT_PROMPT=f"!withdraw (5([A-z]|[0-9])+)\s+([1-9][0-9]*|0)(\.|\.[0-9]+)?\s*({CURRENCY}|)?"
-HELP_PROMPT="(!help)|(!h)"
-MAINTAINER="@#"
+HELP_PROMPT="!help|!h"
 DEP_ACTIVE_TIME=600.0 # seconds
 DEPOSIT_INTERVAL=24.0 # seconds
 CHECK_ALL_INTERVAL=300.0 # seconds
