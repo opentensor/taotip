@@ -11,7 +11,10 @@ from substrateinterface import Keypair
 from ..src import api, db
 from .test_db import DBTestCase
 
-
+"""
+Test depositing funds while mocking the blockchain. 
+Tests DB functions and some API functions.
+"""
 class TestDeposit(DBTestCase):
     def test_deposit_with_zero_balance(self):
         # Create new user with zero balance
@@ -42,6 +45,10 @@ class TestDeposit(DBTestCase):
     def test_check_for_deposits_with_no_deposits(self):
         pass
 
+"""
+Test withdrawing funds while mocking the blockchain. 
+Tests DB functions and some API functions.
+"""
 class TestWithdraw(DBTestCase):
     _api: api.API
     _db: db.Database
