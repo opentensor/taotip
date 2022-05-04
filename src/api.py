@@ -215,7 +215,6 @@ class API:
         address = keypair.ss58_address
         return Address(address, mnemonic, key)
 
-
     async def test_connection(self) -> bool:
         return self.subtensor.connect(failure=False)
 

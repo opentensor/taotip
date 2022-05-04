@@ -184,7 +184,7 @@ class Database:
             "$set": {
                 "unlock": datetime.now() + timedelta(seconds=config.DEP_ACTIVE_TIME),
             }
-        }, return_document=ReturnDocument.AFTER)
+        }, return_document=ReturnDocument.AFTER, upsert=False)
 
         if _doc is not None:
             return _doc["address"]
