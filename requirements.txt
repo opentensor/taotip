@@ -1,5 +1,6 @@
 pymongo[srv]
 mongomock==4.0.0
+callee
 argparse
 substrate-interface==1.2.4
 scalecodec>=1.0.35

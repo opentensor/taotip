@@ -1,10 +1,8 @@
-import imp
 import random
 import bittensor
 import mongomock
 import unittest
 import asyncio
-import pytest
 from cryptography.fernet import Fernet
 from ..src import api, db, parse
 from ..src.db import Address, Tip
