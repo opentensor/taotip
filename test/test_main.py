@@ -10,7 +10,7 @@ from cryptography.fernet import Fernet
 import bittensor
 import discord
 
-from ..src import event_handlers as main, config
+from ..src import event_handlers as main, config, db
 from .test_db import DBTestCase
 
 def async_mock(return_value):
@@ -151,16 +151,18 @@ class TestMain(DBTestCase):
         user: int = random.randint(1, 10000000)
         bot_id: int = user + 1 # not the same as user
         recipient: int = user + 2 # not the same as user or bot_id
-        
-        input_str_tip = '!tip <@!{}> 1'.format(recipient)
+        amount: bittensor.Balance = bittensor.Balance.from_rao(random.randint(1, 10000000))
+        input_str_tip = f'!tip <@!{recipient}> {amount.tao}'
 
         mock_send = AsyncMock(
             return_value=None
         )
         mock_message = SimpleNamespace(
             content=input_str_tip,
-            author=SimpleNamespace(
-                id=user
+            author=MagicMock(
+                id=user,
+                mention='<@!{}>'.format(user),
+                spec=discord.Member
             ),
             channel=MagicMock(
                 spec=discord.channel.TextChannel,
@@ -169,29 +171,39 @@ class TestMain(DBTestCase):
             mentions=[MagicMock(
                 spec=discord.Member,
                 bot=False,
-                id=recipient
+                id=recipient,
+                mention='<@!{}>'.format(recipient)
             )]
         )
         mock_client = MagicMock(
             spec=discord.Client,
             fetch_user=AsyncMock(
-                return_value=SimpleNamespace(
+                return_value=MagicMock(
                     id=user,
-                    bot=False
+                    bot=False,
+                    mention='<@!{}>'.format(user),
+                    spec=discord.Member
                 ),
-                spec=discord.Member,
-                bot=False
             ),
             user=SimpleNamespace(
-                id=bot_id
+                id=bot_id,
+                bot=True,
             )
+        )
+
+        mock_tip_send = AsyncMock(
+            return_value=None
+        )
+        mock_tip = SimpleNamespace(
+            send=mock_tip_send
         )
 
         mock_config = copy.deepcopy(self.mock_config)             
         mock_config.PROMPT = '!tip'
-
-        await main.on_message_(self._db, mock_client, mock_message, mock_config)
-        mock_send.assert_called_once_with(f'') # Someone tipped someone...
+        with patch.object(db.Tip, '__new__', return_value=mock_tip) as mock_tip_new:
+            await main.on_message_(self._db, mock_client, mock_message, mock_config)
+            mock_tip_new.assert_called_once_with(db.Tip, user, recipient, amount.tao)
+            mock_tip_send.assert_called_once() # Someone tipped someone...
 
     async def test_help(self):
         user: int = random.randint(1, 10000000)

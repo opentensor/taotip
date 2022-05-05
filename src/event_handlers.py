@@ -102,8 +102,8 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
                     await channel.send(f"{message.author.mention} {recipient.mention} is not a valid user!")
                     return
                 t = Tip(sender.id, recipient.id, amount)
-
-                if (await t.send(_db)):
+                result = await t.send(_db)
+                if (result):
                     print(f"{sender} tipped {recipient} {amount} tao")
                     await channel.send(f"{sender.mention} tipped {recipient.mention} {amount} tao")
                 else:
