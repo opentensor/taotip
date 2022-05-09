@@ -168,35 +168,42 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
         else:
             await channel.send(config.HELP_STR)
 
-async def check_deposit(_db: Database, _api: api.API, client: discord.Client, config: config.Config):
+async def check_deposit(_db: Database, _api: api.API, client: discord.Client):
+    if client is None:
+        return
+    assert _db is not None
+    assert _api is not None
+
+    # check for deposits
+    try:
+        deposits: List[Transaction] = await _api.check_for_deposits(_db)
+    except WebSocketException as e:
+        print(e)
+        return
+
+    if (len(deposits) > 0):
+        for deposit in tqdm(deposits, desc="Depositing..."):
+            if deposit.amount > 0.0:
+                try:
+                    user = await client.fetch_user(deposit.user)
+                except Exception as e:
+                    print(e, "main.check_deposit", "fetch_user", deposit.user)
+                if user is not None:
+                    new_balance = await _db.check_balance(deposit.user)
+                    await user.send(f"Success! Deposited {deposit.amount} tao.\nYour balance is: {new_balance} tao.")
+    print("Done Check")
+    print("Removing old locks from deposit addresses...")
+    # remove old locks
+    await _db.remove_old_locks()
+    print("Done.")
+
+async def check_deposit_and_wait(_db: Database, _api: api.API, client: discord.Client, config: config.Config):
     if client is None:
         return
     assert _db is not None
     assert _api is not None
 
     while True:
-        # check for deposits
-        try:
-            deposits: List[Transaction] = await _api.check_for_deposits(_db)
-        except WebSocketException as e:
-            print(e)
-            await asyncio.sleep(config.CHECK_ALL_INTERVAL)
-            continue
-
-        if (len(deposits) > 0):
-            for deposit in tqdm(deposits, desc="Depositing..."):
-                if deposit.amount > 0.0:
-                    try:
-                        user = await client.fetch_user(deposit.user)
-                    except Exception as e:
-                        print(e, "main.check_deposit", "fetch_user", deposit.user)
-                    if user is not None:
-                        new_balance = await _db.check_balance(deposit.user)
-                        await user.send(f"Success! Deposited {deposit.amount} tao.\nYour balance is: {new_balance} tao.")
-        print("Done Check")
-        print("Removing old locks from deposit addresses...")
-        # remove old locks
-        await _db.remove_old_locks()
-        print("Done.")
+        await check_deposit(_db, _api, client)
         # done, await for time
         await asyncio.sleep(config.DEPOSIT_INTERVAL)

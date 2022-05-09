@@ -250,8 +250,29 @@ class TestMain(DBTestCase):
         mock_send.assert_called_once_with(help_str_mock)
 
     async def test_check_deposit(self):
-        # TODO: test check_deposit is called properly
-        self.assert_(False)
+        mock_userid: str = str(random.randint(1, 10000000))
+        mock_client = MagicMock(
+            spec=discord.Client,
+            fetch_user=AsyncMock(
+                return_value=SimpleNamespace(
+                    id=mock_userid,
+                    send=AsyncMock(
+                        return_value=None
+                    ),
+                    spec=discord.Member
+                ),
+            )
+        )
+
+        with patch.object(self._api, 'check_for_deposits', return_value=[
+            SimpleNamespace( user=mock_userid, amount=1.0 )
+            ]
+        ) as mock_check_for_deposits:
+            await main.check_deposit(self._db, self._api, mock_client)
+            mock_check_for_deposits.assert_called_once()
+            mock_client.fetch_user.assert_called_once_with(mock_userid)
+
+            
     
     async def test_lock_all_addresses(self):
         # Mock DB to return a list of addresses
@@ -285,7 +306,6 @@ class TestMain(DBTestCase):
                 'address': addr.address
             })['locked']
             self.assertTrue(locked, f'{addr.address} is not locked')
-
 
     async def test_on_ready(self):
         # TODO: test everything is ready after on_ready
