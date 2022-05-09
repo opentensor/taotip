@@ -193,8 +193,48 @@ class TestMain(DBTestCase):
                 mock_send.assert_has_calls([call(unittest.mock.ANY), call(Contains(dep_str_mock_1))])
 
     async def test_withdraw(self):
-        # TODO: test withdraw is called with correct args
-        self.assert_(False)
+        user_id: int = random.randint(1, 10000000)
+        user: str = str(user_id)
+        bot_id: str = str(user_id + 1) # not the same as user
+
+        withd_addr = self._api.create_address(self.mock_config.COLDKEY_SECRET)
+        amount: bittensor.Balance = bittensor.Balance.from_rao(random.randint(1, 10000000))
+        input_str_withd = f'!withdraw {withd_addr.address} {amount.tao} tao'
+
+        mock_send = AsyncMock(
+            return_value=None
+        )
+        mock_message = SimpleNamespace(
+            content=input_str_withd,
+            author=SimpleNamespace(
+                id=user
+            ),
+            channel=MagicMock(
+                spec=discord.channel.DMChannel,
+                send=mock_send
+            )
+        )
+        mock_client = MagicMock(
+            spec=discord.Client,
+            fetch_user=MagicMock(
+                return_value=SimpleNamespace(
+                    id=user
+                ),
+                spec=discord.Member,
+            ),
+            user=SimpleNamespace(
+                id=bot_id
+            )
+        )
+
+        mock_config = copy.deepcopy(self.mock_config)
+        mock_new_balance = bittensor.Balance.from_rao(random.randint(1, 2) * amount.rao) - amount
+
+        with patch.object(db.Transaction, 'withdraw', return_value=mock_new_balance.tao) as mock_withdraw:
+            await main.on_message_(self._db, mock_client, mock_message, mock_config)
+
+            mock_withdraw.assert_called_once_with(self._db, withd_addr.address, mock_config.COLDKEY_SECRET)
+            mock_send.assert_awaited_once_with(Contains(f'Your new balance is: {mock_new_balance.tao} tao'))
 
     async def test_tip(self):
         user: int = random.randint(1, 10000000)
