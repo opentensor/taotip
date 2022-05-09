@@ -3,15 +3,18 @@ import copy
 import random
 from types import SimpleNamespace
 from typing import Coroutine
-from callee import Contains
-from unittest.mock import MagicMock, patch, AsyncMock
-from cryptography.fernet import Fernet
+from unittest.mock import AsyncMock, MagicMock, patch
+from substrateinterface import Keypair
 
 import bittensor
 import discord
+from callee import Contains
+from cryptography.fernet import Fernet
 
-from ..src import event_handlers as main, config, db
+from ..src import config, db
+from ..src import event_handlers as main
 from .test_db import DBTestCase
+
 
 def async_mock(return_value):
     f = asyncio.Future()
@@ -251,8 +254,38 @@ class TestMain(DBTestCase):
         self.assert_(False)
     
     async def test_lock_all_addresses(self):
-        # TODO: test lock_addr is called properly
-        self.assert_(False)
+        # Mock DB to return a list of addresses
+        key_bytes: bytes = self.mock_config.COLDKEY_SECRET
+        mock_addresses = [ # 10 mock addresses
+            self._api.create_address(key_bytes)
+            for _ in range(10)
+        ]
+
+        # Insert mock addresses into db
+        self._db.db.addresses.insert_many([
+            {
+                'address': addr.address,
+                'locked': False # not locked
+            } for addr in mock_addresses
+        ])
+
+        # Check that all addresses are unlocked
+        for addr in mock_addresses:
+            locked: bool = self._db.db.addresses.find_one({
+                'address': addr.address
+            })['locked']
+            self.assertFalse(locked, f'Address {addr.address} is locked')
+        
+        # Lock all addresses using lock_all_addresses
+        await main.lock_all_addresses(self._db, self.mock_config)
+
+        # Check that all addresses are locked
+        for addr in mock_addresses:
+            locked: bool = self._db.db.addresses.find_one({
+                'address': addr.address
+            })['locked']
+            self.assertTrue(locked, f'{addr.address} is not locked')
+
 
     async def test_on_ready(self):
         # TODO: test everything is ready after on_ready

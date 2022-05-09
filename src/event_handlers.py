@@ -68,16 +68,19 @@ async def on_ready_(_db: Database, _api: api.API, client: discord.Client, config
     for addr in addrs:
         await _db.lock_addr(addr)
     
-async def lock_all_addresses(_db: Database, config: config.Config):
+async def lock_all_addresses_and_wait(_db: Database, config: config.Config):
     assert _db is not None
     while True:
-        # lock all addresses
-        addrs: List[str] = await _db.get_all_addresses()
-        for addr in tqdm(addrs, desc="Locking all addresses..."):
-            if (await _db.lock_addr(addr)):
-                await _db.set_lock_expiry(addr, 1)
+        await lock_all_addresses(_db, config)
+        await asyncio.sleep(config.CHECK_ALL_INTERVAL) 
 
-        await asyncio.sleep(config.CHECK_ALL_INTERVAL)   
+async def lock_all_addresses(_db: Database, config: config.Config):
+    assert _db is not None
+    # lock all addresses
+    addrs: List[str] = await _db.get_all_addresses()
+    for addr in tqdm(addrs, desc="Locking all addresses..."):
+        if (await _db.lock_addr(addr)):
+            await _db.set_lock_expiry(addr, 1)     
 
 async def on_message_(_db: Database, client: discord.Client, message: discord.Message, config: config.Config):
     assert _db is not None
