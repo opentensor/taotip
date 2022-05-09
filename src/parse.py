@@ -10,7 +10,7 @@ def is_valid_ss58_address(addr: str, format: int) -> bool:
         return False
 class Parser:
     def __init__(self, config: config.Config):
-        self.amount_check = re.compile(r'> (([1-9][0-9]*|0)(\.[0-9]*)?)\s*(' + config.CURRENCY + r'|)$')
+        self.amount_check = re.compile(r' (([1-9][0-9]*|0)(\.[0-9]*)?)\s*(' + config.CURRENCY + r'|)$')
 
     def get_amount(self, message: str) -> float:
         """
