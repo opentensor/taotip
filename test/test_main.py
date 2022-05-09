@@ -1,10 +1,11 @@
 import asyncio
 import copy
 import random
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Coroutine
-from unittest.mock import AsyncMock, MagicMock, patch
-from substrateinterface import Keypair
+import unittest
+from unittest.mock import AsyncMock, MagicMock, patch, call
 
 import bittensor
 import discord
@@ -47,7 +48,6 @@ mock_config_: SimpleNamespace = SimpleNamespace(
 )
 mock_config_.HELP_STR = mock_config_.HELP_STR.replace('<maintainer>', mock_config_.MAINTAINER)
 mock_config_.WIT_PROMPT = mock_config_.WIT_PROMPT.replace('<currency>', mock_config_.CURRENCY)
-
 
 
 class TestMain(DBTestCase):
@@ -143,8 +143,54 @@ class TestMain(DBTestCase):
         mock_send.assert_called_once_with(f'Your balance is {bal.tao} tao')
 
     async def test_deposit(self):
-        # TODO: test deposit is called with correct args
-        self.assert_(False)
+        user_id: int = random.randint(1, 10000000)
+        user: str = str(user_id)
+        bot_id: str = str(user_id + 1) # not the same as user
+
+        input_str_dep = '!deposit'
+
+        mock_send = AsyncMock(
+            return_value=None
+        )
+        mock_message = SimpleNamespace(
+            content=input_str_dep,
+            author=SimpleNamespace(
+                id=user
+            ),
+            channel=MagicMock(
+                spec=discord.channel.DMChannel,
+                send=mock_send
+            )
+        )
+        mock_client = MagicMock(
+            spec=discord.Client,
+            fetch_user=MagicMock(
+                return_value=SimpleNamespace(
+                    id=user
+                ),
+                spec=discord.Member,
+            ),
+            user=SimpleNamespace(
+                id=bot_id
+            )
+        )
+
+        mock_addr_: db.Address = self._api.create_address(self.mock_config.COLDKEY_SECRET)
+        mock_addr = mock_addr_.address
+        mock_expiry = datetime.now() + timedelta(seconds=self.mock_config.DEP_ACTIVE_TIME)
+        dep_str_mock_1 = f"Please deposit to {mock_addr}."
+
+        mock_config = copy.deepcopy(self.mock_config)
+        mock_config.DEP_PROMPT = '!deposit'
+
+        with patch.object(self._db, 'get_deposit_addr', return_value=mock_addr) as mock_get_dep_addr:
+            with patch.object(self._db, 'get_lock_expiry', return_value=mock_expiry) as mock_get_lock_expiry:
+                await main.on_message_(self._db, mock_client, mock_message, mock_config)
+
+                mock_get_dep_addr.assert_called_once()
+                mock_get_lock_expiry.assert_called_once_with(mock_addr)
+                # Sends message about fees, then sends message about deposit address
+                mock_send.assert_has_calls([call(unittest.mock.ANY), call(Contains(dep_str_mock_1))])
 
     async def test_withdraw(self):
         # TODO: test withdraw is called with correct args
@@ -270,9 +316,7 @@ class TestMain(DBTestCase):
         ) as mock_check_for_deposits:
             await main.check_deposit(self._db, self._api, mock_client)
             mock_check_for_deposits.assert_called_once()
-            mock_client.fetch_user.assert_called_once_with(mock_userid)
-
-            
+            mock_client.fetch_user.assert_called_once_with(mock_userid)            
     
     async def test_lock_all_addresses(self):
         # Mock DB to return a list of addresses

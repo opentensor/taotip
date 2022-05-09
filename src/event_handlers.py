@@ -123,11 +123,15 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
             
             await channel.send(f"Your balance is {balance} tao")
         elif (validator.is_deposit_or_withdraw(message.content)):
-            try:
-                amount = parser.get_amount(message.content)
-            except Exception as e:
-                await channel.send(f"Incorrect format.\n" + config.HELP_STR)
-                return
+            amount: float
+            if (validator.is_deposit(message.content)):
+                amount = 0.0
+            else:
+                try:
+                    amount = parser.get_amount(message.content)
+                except Exception as e:
+                    await channel.send(f"Incorrect format.\n" + config.HELP_STR)
+                    return
             
             t = Transaction(user.id, amount)
             new_balance: int = None
