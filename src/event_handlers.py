@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from string import Template
 from types import SimpleNamespace
-from typing import Coroutine, Dict, List
+from typing import Coroutine, Dict, List, Tuple
 
 import discord
 import pymongo
@@ -25,20 +25,18 @@ def strfdelta(tdelta, fmt):
     t = DeltaTemplate(fmt)
     return t.substitute(**d)
 
-async def on_ready_(_db: Database, _api: api.API, client: discord.Client, config: config.Config):
+async def on_ready_(client: discord.Client, config: config.Config) -> Tuple[api.API, Database]:
     try:
         _api = api.API(testing=config.TESTING)
     except WebSocketException as e:
         print(e)
-        print("Failed to connect to Substrate node. Exiting...")
-        await client.close()     
-        return
+        print("Failed to connect to Substrate node...")
+        _api = None
 
     print('We have logged in as {0.user}'.format(client))
-    if (not (await _api.test_connection())):
-        print("Error: Can't connect to subtensor node")
-        await client.close()
-        return
+    if (_api is None or not (await _api.test_connection())):
+        print("Error: Can't connect to subtensor node...")
+        _api = None
     print(f"Connected to Bittensor ({_api.network})!")
 
     try:
@@ -51,22 +49,23 @@ async def on_ready_(_db: Database, _api: api.API, client: discord.Client, config
                 print(await _db.create_new_addr(config.COLDKEY_SECRET))
     except Exception as e:
         print(e)
-        print("Can't connect to db")
-        await client.close()     
-        return
+        print("Can't connect to db...")  
+        _db = None
 
-    balance = Balance(0.0)
-    addrs: List[Dict] = list(await _db.get_all_addresses())
-    for addr in tqdm(addrs, "Checking Balances..."):
-        _balance = _api.get_wallet_balance(addr["address"])
-        balance += _balance
+    if _db is not None:
+        if _api is not None:
+            balance = Balance(0.0)
+            addrs: List[Dict] = list(await _db.get_all_addresses())
+            for addr in tqdm(addrs, "Checking Balances..."):
+                _balance = _api.get_wallet_balance(addr["address"])
+                balance += _balance
 
-    print(f"Wallet Balance: {balance}")
+            print(f"Wallet Balance: {balance}")
 
-    # lock all addresses
-    addrs: List[str] = await _db.get_all_addresses()
-    for addr in addrs:
-        await _db.lock_addr(addr)
+        # lock all addresses
+        await lock_all_addresses(_db, config)
+        
+    return _api, _db
     
 async def lock_all_addresses_and_wait(_db: Database, config: config.Config):
     assert _db is not None

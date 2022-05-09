@@ -1,3 +1,4 @@
+import asyncio
 import discord
 
 from src import api, event_handlers
@@ -16,7 +17,13 @@ def main() -> None:
     async def on_ready():
         global _db
         global _api
-        await event_handlers.on_ready_(_db, _api, client, config)
+        _api, _db = await event_handlers.on_ready_(client, config)
+
+        if _api is None or _db is None:
+            print("Failed to initialize\nRetrying in 5s...")
+            await asyncio.sleep(5) # wait 5 seconds
+            await on_ready()
+            return
         # add to client loop
         client.loop.create_task(lambda _db: event_handlers.lock_all_addresses_and_wait(_db, config))
         client.loop.create_task(lambda client, _db, _api: event_handlers.check_deposit_and_wait(_db, _api, client, config))
