@@ -74,6 +74,11 @@ class TestGetAmount(unittest.TestCase):
         amount = random.random() * 100000
         input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> {amount} tao"
         self.assertEqual(get_amount(input), amount)
+
+        # Test with withdraw
+        input: str = f"!withdraw fakeAddressDoesntMatter 1.5 tao"
+        self.assertEqual(get_amount(input), 1.5)
+
     
     def test_get_amount_fail(self):
         get_amount = self.parser.get_amount
@@ -81,14 +86,6 @@ class TestGetAmount(unittest.TestCase):
         input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> at"
         self.assertRaises(ValueError, get_amount, input)
         input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> at tao"
-        self.assertRaises(ValueError, get_amount, input)
-        input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> tao 1.0"
-        self.assertRaises(ValueError, get_amount, input)
-        input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> tau 89"
-        self.assertRaises(ValueError, get_amount, input)
-        input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> Tau 2.92"
-        self.assertRaises(ValueError, get_amount, input)
-        input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> Tau 90"
         self.assertRaises(ValueError, get_amount, input)
         input: str = f"!tip <@!{''.join([str(random.randint(0,9)) for _ in range(random.randint(0,18))])}> tao"
         self.assertRaises(ValueError, get_amount, input)
