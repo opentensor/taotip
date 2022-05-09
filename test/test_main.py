@@ -96,8 +96,10 @@ class TestMain(DBTestCase):
 
         mock_config = copy.deepcopy(self.mock_config)
         mock_config.BAL_PROMPT = '!bal|!balance'
-        await main.on_message_(self._db, mock_client, mock_message, mock_config)
-        mock_send.assert_called_once_with(f'Your balance is {bal.tao} tao')
+        with patch.object(self._db, 'check_balance', return_value=bal.tao) as mock_check_balance:
+            await main.on_message_(self._db, mock_client, mock_message, mock_config)
+            mock_check_balance.assert_called_once_with(user)
+
 
     async def test_balance(self):
         bal: bittensor.Balance = bittensor.Balance.from_rao(random.randint(1, 10000000))
@@ -139,8 +141,9 @@ class TestMain(DBTestCase):
 
         mock_config = copy.deepcopy(self.mock_config)
         mock_config.BAL_PROMPT = '!bal|!balance'
-        await main.on_message_(self._db, mock_client, mock_message, mock_config)
-        mock_send.assert_called_once_with(f'Your balance is {bal.tao} tao')
+        with patch.object(self._db, 'check_balance', return_value=bal.tao) as mock_check_balance:
+            await main.on_message_(self._db, mock_client, mock_message, mock_config)
+            mock_check_balance.assert_called_once_with(user)
 
     async def test_deposit(self):
         user_id: int = random.randint(1, 10000000)
@@ -177,20 +180,17 @@ class TestMain(DBTestCase):
 
         mock_addr_: db.Address = self._api.create_address(self.mock_config.COLDKEY_SECRET)
         mock_addr = mock_addr_.address
-        mock_expiry = datetime.now() + timedelta(seconds=self.mock_config.DEP_ACTIVE_TIME)
         dep_str_mock_1 = f"Please deposit to {mock_addr}."
 
         mock_config = copy.deepcopy(self.mock_config)
         mock_config.DEP_PROMPT = '!deposit'
 
         with patch.object(self._db, 'get_deposit_addr', return_value=mock_addr) as mock_get_dep_addr:
-            with patch.object(self._db, 'get_lock_expiry', return_value=mock_expiry) as mock_get_lock_expiry:
-                await main.on_message_(self._db, mock_client, mock_message, mock_config)
+            await main.on_message_(self._db, mock_client, mock_message, mock_config)
 
-                mock_get_dep_addr.assert_called_once()
-                mock_get_lock_expiry.assert_called_once_with(mock_addr)
-                # Sends message about fees, then sends message about deposit address
-                mock_send.assert_has_calls([call(unittest.mock.ANY), call(Contains(dep_str_mock_1))])
+            mock_get_dep_addr.assert_called_once()
+            # Sends message about fees, then sends message about deposit address
+            mock_send.assert_has_calls([call(unittest.mock.ANY), call(Contains(dep_str_mock_1))])
 
     async def test_withdraw(self):
         user_id: int = random.randint(1, 10000000)
@@ -333,64 +333,8 @@ class TestMain(DBTestCase):
         mock_config.HELP_STR = help_str_mock
 
         await main.on_message_(self._db, mock_client, mock_message, mock_config)
-        mock_send.assert_called_once_with(help_str_mock)
-
-    async def test_check_deposit(self):
-        mock_userid: str = str(random.randint(1, 10000000))
-        mock_client = MagicMock(
-            spec=discord.Client,
-            fetch_user=AsyncMock(
-                return_value=SimpleNamespace(
-                    id=mock_userid,
-                    send=AsyncMock(
-                        return_value=None
-                    ),
-                    spec=discord.Member
-                ),
-            )
-        )
-
-        with patch.object(self._api, 'check_for_deposits', return_value=[
-            SimpleNamespace( user=mock_userid, amount=1.0 )
-            ]
-        ) as mock_check_for_deposits:
-            await main.check_deposit(self._db, self._api, mock_client)
-            mock_check_for_deposits.assert_called_once()
-            mock_client.fetch_user.assert_called_once_with(mock_userid)            
+        mock_send.assert_called_once_with(help_str_mock)           
     
-    async def test_lock_all_addresses(self):
-        # Mock DB to return a list of addresses
-        key_bytes: bytes = self.mock_config.COLDKEY_SECRET
-        mock_addresses = [ # 10 mock addresses
-            self._api.create_address(key_bytes)
-            for _ in range(10)
-        ]
-
-        # Insert mock addresses into db
-        self._db.db.addresses.insert_many([
-            {
-                'address': addr.address,
-                'locked': False # not locked
-            } for addr in mock_addresses
-        ])
-
-        # Check that all addresses are unlocked
-        for addr in mock_addresses:
-            locked: bool = self._db.db.addresses.find_one({
-                'address': addr.address
-            })['locked']
-            self.assertFalse(locked, f'Address {addr.address} is locked')
-        
-        # Lock all addresses using lock_all_addresses
-        await main.lock_all_addresses(self._db, self.mock_config)
-
-        # Check that all addresses are locked
-        for addr in mock_addresses:
-            locked: bool = self._db.db.addresses.find_one({
-                'address': addr.address
-            })['locked']
-            self.assertTrue(locked, f'{addr.address} is not locked')
-
     async def test_on_ready(self):
         # TODO: test everything is ready after on_ready
         self.assert_(False)
