@@ -70,8 +70,8 @@ class TestDeposit(DBTestCase):
         # Deposit funds
         new_balance: float = await transaction.deposit(self._db)
         # Check balance
-        balance: float = await self._db.check_balance(user)
-        self.assertEqual(balance, amount.tao)
+        balance: bittensor.Balance = await self._db.check_balance(user)
+        self.assertEqual(balance, amount)
         self.assertEqual(new_balance, amount.tao)
         # Check balance in db
         balance_doc: Dict = self._db.db.balances.find_one({
@@ -111,8 +111,8 @@ class TestDeposit(DBTestCase):
         # Deposit funds
         new_balance: float = await transaction.deposit(self._db)
         # Check balance
-        balance: float = await self._db.check_balance(user)
-        self.assertEqual(balance, expected_bal.tao)
+        balance: bittensor.Balance = await self._db.check_balance(user)
+        self.assertEqual(balance, expected_bal)
         self.assertEqual(new_balance, expected_bal.tao)
         # Check balance in db
         balance_doc: Dict = self._db.db.balances.find_one({
@@ -148,8 +148,8 @@ class TestDeposit(DBTestCase):
         # Deposit funds
         new_balance: float = await transaction.deposit(self._db)
         # Check balance
-        balance: float = await self._db.check_balance(user)
-        self.assertEqual(balance, amount.tao)
+        balance: bittensor.Balance = await self._db.check_balance(user)
+        self.assertEqual(balance, amount)
         self.assertEqual(new_balance, amount.tao)
         # Check balance in db
         balance_doc: Dict = self._db.db.balances.find_one({
@@ -190,7 +190,7 @@ class TestDeposit(DBTestCase):
         addresses: List[str] = []
         new_balances: Dict[str, bittensor.Balance] = {}
         for _ in range(3):
-            addresses.append(await self._db.create_new_addr(key_bytes))
+            addresses.append(await self._db.create_new_address(key_bytes))
             # Update address doc in db, with 0 balance
             self._db.db.addresses.update_one({
                 'address': addresses[-1]
@@ -245,7 +245,7 @@ class TestDeposit(DBTestCase):
         # Create a few new addresess
         addresses: Set[str] = set()
         for _ in range(0, 10):
-            addr: str = await self._db.create_new_addr(key_bytes)
+            addr: str = await self._db.create_new_address(key_bytes)
             addresses.add(addr)
 
         # Get addresses
@@ -296,8 +296,8 @@ class TestWithdraw(DBTestCase):
             await transaction.withdraw(self._db, coldkeyadd, key_bytes)
         
         # Check that balance is still 0
-        balance: float = await self._db.check_balance(user)
-        self.assertEqual(balance, 0)
+        balance: bittensor.Balance = await self._db.check_balance(user)
+        self.assertEqual(balance.tao, 0)
 
     async def test_withdraw_with_nonzero_balance_not_enough(self):   
         user: int = random.randint(0, 1000000)
@@ -313,8 +313,8 @@ class TestWithdraw(DBTestCase):
         })
 
         # Check that balance is in db
-        balance: float = await self._db.check_balance(user)
-        self.assertEqual(balance, bal.tao)
+        balance: bittensor.Balance = await self._db.check_balance(user)
+        self.assertEqual(balance, bal)
 
         # Attempt to withdraw        
         coldkeyadd: str = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
@@ -325,15 +325,15 @@ class TestWithdraw(DBTestCase):
             await transaction.withdraw(self._db, coldkeyadd, key_bytes)
         
         # Check that balance is unchanged
-        balance: float = await self._db.check_balance(user)
-        self.assertEqual(balance, bal.tao)
+        balance: bittensor.Balance = await self._db.check_balance(user)
+        self.assertEqual(balance, bal)
 
     async def test_withdraw_with_no_balance_doc(self):
         user: int = random.randint(0, 1000000)
         # Insert address doc into db        
         key_bytes: bytes = Fernet.generate_key() # doens't matter because it should stop before it gets here
         ## Create tip bot address
-        addr: str = await self._db.create_new_addr(key_bytes) 
+        addr: str = await self._db.create_new_address(key_bytes) 
         ## Amount to withdraw
         amount: float = random.random() * 10000 + 2
         ## Tip bot address balance
@@ -391,13 +391,13 @@ class TestWithdraw(DBTestCase):
         self.assertIn(e.exception.reason, 'No withdraw addresses found')
         
         # Check that balance is unchanged
-        balance: float = await self._db.check_balance(str(user))
-        self.assertEqual(balance, bal.tao)
+        balance: bittensor.Balance = await self._db.check_balance(str(user))
+        self.assertEqual(balance, bal)
 
     async def test_sign_transaction(self):
         key_bytes: bytes = Fernet.generate_key()
         # Create address on db 
-        addr: str = await self._db.create_new_addr(key_bytes)        
+        addr: str = await self._db.create_new_address(key_bytes)        
         amount: float = random.random() * 10000 + 2.0
         addr_bal: bittensor.Balance = bittensor.Balance.from_float(amount + 20.0)
         # Increase addr balance above amount to withdraw
@@ -446,11 +446,11 @@ class TestWithdraw(DBTestCase):
         })
 
         # Check that balance is in db
-        balance: float = await self._db.check_balance(user)
-        self.assertEqual(balance, user_bal.tao)
+        balance: bittensor.Balance = await self._db.check_balance(user)
+        self.assertEqual(balance, user_bal)
 
         # Create address on db
-        addr: str = await self._db.create_new_addr(key_bytes)
+        addr: str = await self._db.create_new_address(key_bytes)
         # Make the address have enough balance
         addr_balance: bittensor.Balance = bittensor.Balance.from_float(amount + 20.0)
         self._db.db.addresses.update_one({
@@ -493,8 +493,8 @@ class TestWithdraw(DBTestCase):
                 self.assertEqual(new_balance, expected_balance)
 
                 # Check that balance is in db
-                balance: float = await self._db.check_balance(user)
-                self.assertEqual(balance, expected_balance.tao)
+                balance: bittensor.Balance = await self._db.check_balance(user)
+                self.assertEqual(balance, expected_balance)
 
                 # Check that addr balance is in db
                 addr_db: Dict = self._db.db.addresses.find_one({'address': addr})

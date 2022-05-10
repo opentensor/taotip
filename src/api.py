@@ -134,62 +134,30 @@ class API:
             )
 
             pubkeypair = Keypair(ss58_address=coldkeyadd)
-            paytmentInfo = substrate.get_payment_info(call, pubkeypair)
+            paymentInfo = substrate.get_payment_info(call, pubkeypair)
             # Retrieve nonce
             nonce = substrate.get_account_nonce(pubkeypair.ss58_address) or 0
             signature_payload = substrate.generate_signature_payload(call=call, nonce=nonce, era='00')
 
-        return call, signature_payload, paytmentInfo
+        return call, signature_payload, paymentInfo
 
     def verify_coldkeyadd(self, coldkeyadd: str) -> bool:
         with self.subtensor.substrate as substrate:
             is_valid = substrate.is_valid_ss58_address(coldkeyadd)
             return is_valid
 
-    async def find_withdraw_address(self, _db: Database, transaction: Transaction) -> Tuple[List[str], List[float]]:
+    async def find_withdraw_address(self, _db: Database, transaction: Transaction, key: bytes) -> Tuple[Optional[str], float]:
         """
         Finds valid withdraw addresses with available balance.
         """
-        final_addrs: List[str] = []
-        final_amts: List[float] = []
-        remaining_balance: float = transaction.amount
-        fee: float = transaction.fee
-        # get all possible withdraw addresses
-        withdraw_addrs: List[str] = await _db.get_withdraw_addresses()
-        if not withdraw_addrs:
-            print ("No withdraw addresses found")
-            raise WithdrawException("User:" + transaction.user, transaction.amount, 'No withdraw addresses found')
+        addr: Address = _db.get_address_by_user(transaction.user, key)
+        if not addr:
+            return None, 0.0
 
-        withdraw_addrs = [addr['address'] for addr in withdraw_addrs]
-        for addr in withdraw_addrs:
-            # lock addr
-            if(await _db.lock_addr(addr)):
-                balance_: 'bittensor.Balance' = self.get_wallet_balance(addr)
-                balance: float = balance_.tao
-                if (balance > 0.0):
-                    
-                    amt: float = 0.0
-
-                    if (balance >= remaining_balance + fee):
-                        amt = remaining_balance
-                    else:
-                        amt = balance - fee
-                        if amt <= 0.0:
-                            continue
-                    
-                    remaining_balance -= amt
-                    final_addrs.append(addr)
-                    final_amts.append(amt)
-                    if (remaining_balance <= 0.0):
-                        break
-
-                await _db.unlock_addr(addr)
-            else:
-                # no lock
-                continue
-        else:
-            raise "Could not find enough tao to withdraw"
-        return final_addrs, final_amts
+        withdraw_addr = addr.address
+        balance_: 'bittensor.Balance' = self.get_wallet_balance(withdraw_addr)
+        balance: float = balance_.tao
+        return withdraw_addr, balance
             
     async def sign_transaction(self, _db: Database, transaction: Dict, addr: str, key: bytes) -> Dict:
         doc: Address = _db.get_address(addr, key)
@@ -236,5 +204,22 @@ class API:
                 new_transactions.append(new_transaction)
         return new_transactions
 
-    async def get_withdraw_fee(self) -> float:
-        return 0.125
+    async def get_withdraw_fee(self, transaction: Dict) -> bittensor.Balance:
+        fee = await self.get_fee(
+            transaction["coldkeyadd"],
+            transaction["dest"],
+            bittensor.Balance.from_tao(transaction["dest"])
+        )
+
+        return fee
+
+    async def get_fee(self, addr: str, dest: str, amount: bittensor.Balance) -> bittensor.Balance:
+        _, _, paymentInfo = self.init_transaction(
+            addr,
+            dest,
+            amount
+        )
+
+        fee_rao = paymentInfo["partialFee"]
+        fee = bittensor.Balance.from_rao(fee_rao)
+        return fee

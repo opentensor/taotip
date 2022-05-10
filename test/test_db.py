@@ -1,9 +1,11 @@
 import random
+from unittest.mock import MagicMock
 import bittensor
 import mongomock
 import unittest
 import asyncio
 from cryptography.fernet import Fernet
+from more_itertools import side_effect
 from ..src import api, db, parse
 from ..src.db import Address, Tip
 
@@ -16,66 +18,8 @@ class DBTestCase(unittest.IsolatedAsyncioTestCase):
     def tearDown(self) -> None:
         self._db.db.addresses.drop()
         self._db.db.transactions.drop()
-        self._db.db.accounts.drop()
         self._db.db.balances.drop()
         self._db.db.tips.drop()
-        
-class TestAddressLock(DBTestCase):
-    async def test_address_lock_already_locked(self):
-        # Create locked address in db
-        self._db.db.addresses.insert_one({
-            'address': '5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx',
-            'locked': True
-        })
-
-        # Check if can acquire lock
-        self.assertFalse(await self._db.lock_addr('5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx'))
-
-    async def test_address_lock_not_locked(self):
-        # Create unlocked address in db   
-        self._db.db.addresses.insert_one({
-            'address': '5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx',
-            'locked': False
-        })
-
-        # Check if can acquire lock
-        self.assertTrue(await self._db.lock_addr('5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx'))
-
-    async def test_address_lock_locked_during_test(self):
-        # Create unlocked address in db
-        self._db.db.addresses.insert_one({
-            'address': '5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx',
-            'locked': False
-        })
-
-        # Should acquire lock
-        self.assertTrue(await self._db.lock_addr('5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx'))
-
-        # Should not acquire lock
-        self.assertFalse(await self._db.lock_addr('5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx'))
-
-    async def test_address_lock_locked_with_expiry(self):
-        # Create locked address in db
-        self._db.db.addresses.insert_one({
-            'address': '5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx',
-            'locked': True
-        })
-
-        # Set lock expiry
-        ## 3 seconds
-        await self._db.set_lock_expiry('5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx', 3)
-    
-        # Should acquire lock. Lock expires in 3 seconds
-        self.assertFalse(await self._db.lock_addr('5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx'))
-
-        # Wait for lock to expire, 4 seconds
-        await asyncio.sleep(4)
-
-        unlocked: int = await self._db.remove_old_locks()
-        self.assertEqual(unlocked, 1)
-
-        # Should acquire lock, lock has expired
-        self.assertTrue(await self._db.lock_addr('5DkpHw4sL5ZD9FQ8Z5Z5xX3z8bwZKXzQXx'))
 
 class TestAddressEncrypt(DBTestCase):
     async def test_encrypt(self):
@@ -135,7 +79,7 @@ class TestAddressEncrypt(DBTestCase):
 
     async def test_create_address_get_encrypted_mnemonic_from_db(self):
         key_bytes = Fernet.generate_key()
-        addr: str = await self._db.create_new_addr(key_bytes)
+        addr: str = await self._db.create_new_address(key_bytes)
 
         # Get address from db, should be encrypted
         encrypted_addr = self._db.db.addresses.find_one({'address': addr})
@@ -163,40 +107,10 @@ class TestAddressEncrypt(DBTestCase):
         })
         self.assertEqual(self._db.db.addresses.find_one({'address': addr.address})['mnemonic'], addr.mnemonic)        
 
-class TestBalanceChange(DBTestCase):
-    async def test_check_balance(self):
-        # Create user with balance
-        user_id = random.randint(0, 1000000)
-        bal = random.randint(0, 1000000)
-        self._db.db.balances.insert_one({
-            'discord_user': user_id,
-            'balance': bal
-        })
-
-        # Check balance
-        self.assertEqual(await self._db.check_balance(user_id), bittensor.Balance.from_rao(bal).tao)
-    
-    async def test_update_balance(self):
-        # Create user with balance
-        user_id = random.randint(0, 1000000)
-        bal = random.randint(0, 1000000)
-        self._db.db.balances.insert_one({
-            'discord_user': user_id,
-            'balance': bal
-        })
-
-        # Check balance
-        self.assertEqual(await self._db.check_balance(user_id), bittensor.Balance.from_rao(bal).tao)
-        # Update balance
-        update_amount = random.random() * 1000 # Random float between 0 and 1000
-        bal_new: bittensor.Balance = bittensor.Balance.from_rao(bal) + bittensor.Balance.from_float(update_amount)
-        await self._db.update_balance(user_id, update_amount)
-        self.assertEqual(await self._db.check_balance(user_id), bal_new.tao)
-
 class TestAddressCreate(DBTestCase):
     async def test_create_address(self):
         key_bytes: bytes = Fernet.generate_key()
-        addr: str = await self._db.create_new_addr(key=key_bytes)
+        addr: str = await self._db.create_new_address(key=key_bytes)
         self.assertIsNotNone(addr)
         self.assertTrue(parse.is_valid_ss58_address(addr, 42)) #bittensor ss58 format
 
@@ -215,14 +129,14 @@ class TestTips(DBTestCase):
         # Create user with balance
         sender = random.randint(0, 1000000)
         recipient = random.randint(0, 1000000)
-        amount = random.random() * 1000 + 1.0# Random float between 1 and 1001
+        amount = bittensor.Balance.from_float(random.random() * 1000 + 1.0) # Random float between 1 and 1001
 
         tip: Tip = Tip(sender, recipient, amount)
         self.assertEqual(tip.sender, sender)
         self.assertEqual(tip.recipient, recipient)
         self.assertEqual(tip.amount, amount)
 
-        self.assertEqual(str(tip), f'{sender} -> {recipient} ({amount}) tao')
+        self.assertEqual(str(tip), f'{sender} -> {recipient} ({amount.tao}) tao')
 
         # Insert tip in db
         await self._db.record_tip(tip)
@@ -233,54 +147,59 @@ class TestTips(DBTestCase):
         self.assertEqual(tip_from_db['recipient'], recipient)
         self.assertEqual(
             bittensor.Balance.from_rao(tip_from_db['amount']),
-            bittensor.Balance.from_float(amount)
+            amount
         )
         ## Timestamp on mongo loses some precision
         self.assertAlmostEqual(tip_from_db['time'].timestamp(), tip.time.timestamp(), delta=0.001)
 
     async def test_tip_sent(self):
+        key: bytes = Fernet.generate_key()
         # Create user with balance
         sender = random.randint(0, 1000000)
         recipient = random.randint(0, 1000000)
-        amount: float = random.random() * 1000 + 1.0 # Random float between 1 and 1001
-        bal: int = random.randint(0, 100000000000) + bittensor.Balance.from_float(amount).rao
+        amount: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 1.0) # Random float between 1 and 1001
+        bal: bittensor.Balance = bittensor.Balance.from_rao(random.randint(0, 100000000000)) + amount
         # Insert user in db
-        self._db.db.balances.insert_one({
-            'discord_user': sender,
-            'balance': bal
-        })
+        addr_str: str = await self._db.create_new_address(key, sender)
+        
+        # Mock balance check on chain
+        with unittest.mock.patch.object(self._api.subtensor, 'get_balance', 
+            side_effect=[bal, bal, bal, bal - amount, bal - amount]):
+            # Check balance
+            self.assertEqual(await self._db.check_balance(sender), bal)
+            # Tip user
+            tip: Tip = Tip(sender, recipient, amount)
 
-        # Check balance
-        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
-        # Tip user
-        tip: Tip = Tip(sender, recipient, amount)
-        ## Send tip
-        await tip.send(self._db)
+            # Mock tip sent on chain
+            with unittest.mock.patch.object(self._api.subtensor.substrate, 'submit_extrinsic', return_value=MagicMock(
+                process_events=MagicMock(
+                    return_value=MagicMock()
+                ),
+                is_success=True # Mock success
+            )):
+                ## Send tip
+                await tip.send(self._db, key)
 
-        # Check balance
-        balance_new_expected: bittensor.Balance = bittensor.Balance.from_rao(bal) - bittensor.Balance.from_float(amount)
-        self.assertEqual(await self._db.check_balance(sender), balance_new_expected.tao)    
+                # Check balance
+                balance_new_expected: bittensor.Balance = bal - amount
+                self.assertEqual(await self._db.check_balance(sender), balance_new_expected)    
 
-        # Check balance using db
-        balance_db: int = self._db.db.balances.find_one({'discord_user': sender})['balance']
-        self.assertEqual(balance_db, balance_new_expected.rao)
-
-        # Check if tip is in db
-        tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
-        self.assertEqual(tip_from_db['sender'], sender)
-        self.assertEqual(tip_from_db['recipient'], recipient)
-        self.assertEqual(
-            bittensor.Balance.from_rao(tip_from_db['amount']),
-            bittensor.Balance.from_float(amount)
-        )
-        ## Timestamp on mongo loses some precision
-        self.assertAlmostEqual(tip_from_db['time'].timestamp(), tip.time.timestamp(), delta=0.001)
+                # Check if tip is in db
+                tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
+                self.assertEqual(tip_from_db['sender'], sender)
+                self.assertEqual(tip_from_db['recipient'], recipient)
+                self.assertEqual(
+                    bittensor.Balance.from_rao(tip_from_db['amount']),
+                    amount
+                )
+                ## Timestamp on mongo loses some precision
+                self.assertAlmostEqual(tip_from_db['time'].timestamp(), tip.time.timestamp(), delta=0.001)
 
     async def test_tip_received_no_recipient_balance(self):
         # Create sender with balance
         sender = random.randint(0, 1000000)
         recipient = random.randint(0, 1000000)
-        amount: float = random.random() * 1000 + 1
+        amount: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 1)
         bal: int = random.randint(0, 100000000000) + bittensor.Balance.from_float(amount).rao
         # Insert user in db
         self._db.db.balances.insert_one({
@@ -289,19 +208,15 @@ class TestTips(DBTestCase):
         })
 
         # Check balance
-        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
+        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal))
         # Tip user
         tip: Tip = Tip(sender, recipient, amount)
         ## Send tip
         await tip.send(self._db)
 
         # Check balance of recipient
-        balance_new_expected: bittensor.Balance = bittensor.Balance.from_float(amount)
-        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected.tao)    
-
-        # Check balance using db
-        balance_db: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']
-        self.assertEqual(balance_db, balance_new_expected.rao)
+        balance_new_expected: bittensor.Balance = amount
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected)  
 
         # Check if tip is in db
         tip_from_db: Tip = self._db.db.tips.find_one({'sender': sender, 'recipient': recipient})
@@ -309,7 +224,7 @@ class TestTips(DBTestCase):
         self.assertEqual(tip_from_db['recipient'], recipient)
         self.assertEqual(
             bittensor.Balance.from_rao(tip_from_db['amount']),
-            bittensor.Balance.from_float(amount)
+            amount
         )
         ## Timestamp on mongo loses some precision
         self.assertAlmostEqual(tip_from_db['time'].timestamp(), tip.time.timestamp(), delta=0.001)
@@ -318,7 +233,7 @@ class TestTips(DBTestCase):
         # Create sender with balance
         sender = random.randint(0, 1000000)
         recipient = random.randint(0, 1000000)
-        amount: float = random.random() * 1000 + 1
+        amount: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 1)
         bal: int = random.randint(0, 100000000000) + bittensor.Balance.from_float(amount).rao
         # Insert user in db
         self._db.db.balances.insert_one({
@@ -334,16 +249,16 @@ class TestTips(DBTestCase):
         })
 
         # Check balance
-        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
-        self.assertEqual(await self._db.check_balance(recipient), bittensor.Balance.from_rao(recipient_bal).tao)
+        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal))
+        self.assertEqual(await self._db.check_balance(recipient), bittensor.Balance.from_rao(recipient_bal))
         # Tip user
         tip: Tip = Tip(sender, recipient, amount)
         ## Send tip
         await tip.send(self._db)
 
         # Check balance of recipient
-        balance_new_expected: bittensor.Balance = bittensor.Balance.from_float(amount) + bittensor.Balance.from_rao(recipient_bal)
-        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected.tao)
+        balance_new_expected: bittensor.Balance = amount + bittensor.Balance.from_rao(recipient_bal)
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected)
 
         # Check balance using db
         balance_db: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']
@@ -355,7 +270,7 @@ class TestTips(DBTestCase):
         self.assertEqual(tip_from_db['recipient'], recipient)
         self.assertEqual(
             bittensor.Balance.from_rao(tip_from_db['amount']),
-            bittensor.Balance.from_float(amount)
+            amount
         )
         ## Timestamp on mongo loses some precision
         self.assertAlmostEqual(tip_from_db['time'].timestamp(), tip.time.timestamp(), delta=0.001)
@@ -364,7 +279,7 @@ class TestTips(DBTestCase):
         # Create sender with balance
         sender = random.randint(0, 1000000)
         recipient = random.randint(0, 1000000)
-        amount: float = random.random() * 1000 + 2
+        amount: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 2)
         bal: int = bittensor.Balance.from_float(amount).rao - random.randint(1, 100)
         bal = bal if bal > 0 else 1 # Ensure balance is positive
         # Insert user in db
@@ -381,7 +296,7 @@ class TestTips(DBTestCase):
         })
 
         # Check balance
-        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
+        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal))
         # Tip user
         tip: Tip = Tip(sender, recipient, amount)
         ## Send tip
@@ -391,7 +306,7 @@ class TestTips(DBTestCase):
 
         # Check balance of sender
         balance_new_expected_sender: bittensor.Balance = bittensor.Balance.from_rao(bal)
-        self.assertEqual(await self._db.check_balance(sender), balance_new_expected_sender.tao)
+        self.assertEqual(await self._db.check_balance(sender), balance_new_expected_sender)
         
         # Check balance using db
         balance_db_sender: int = self._db.db.balances.find_one({'discord_user': sender})['balance']
@@ -399,7 +314,7 @@ class TestTips(DBTestCase):
 
         # Check balance of recipient. Should be unchanged
         balance_new_expected_rec: bittensor.Balance = bittensor.Balance.from_rao(recipient_bal)
-        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected_rec.tao)    
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected_rec)    
 
         # Check balance using db
         balance_db_rec: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']
@@ -413,7 +328,7 @@ class TestTips(DBTestCase):
         # Create sender with balance
         sender = random.randint(0, 1000000)
         recipient = random.randint(0, 1000000)
-        amount: float = random.random() * 1000 + 1
+        amount: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 1)
         bal: int = 0
         # Insert user in db
         self._db.db.balances.insert_one({
@@ -429,7 +344,7 @@ class TestTips(DBTestCase):
         })
 
         # Check balance
-        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal).tao)
+        self.assertEqual(await self._db.check_balance(sender), bittensor.Balance.from_rao(bal))
         # Tip user
         tip: Tip = Tip(sender, recipient, amount)
         ## Send tip
@@ -439,7 +354,7 @@ class TestTips(DBTestCase):
 
         # Check balance of sender
         balance_new_expected_sender: bittensor.Balance = bittensor.Balance.from_rao(bal)
-        self.assertEqual(await self._db.check_balance(sender), balance_new_expected_sender.tao)
+        self.assertEqual(await self._db.check_balance(sender), balance_new_expected_sender)
         
         # Check balance using db
         balance_db_sender: int = self._db.db.balances.find_one({'discord_user': sender})['balance']
@@ -447,7 +362,7 @@ class TestTips(DBTestCase):
 
         # Check balance of recipient. Should be unchanged
         balance_new_expected_rec: bittensor.Balance = bittensor.Balance.from_rao(recipient_bal)
-        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected_rec.tao)    
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected_rec)    
 
         # Check balance using db
         balance_db_rec: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']
@@ -461,7 +376,7 @@ class TestTips(DBTestCase):
         # Create sender with balance
         sender = random.randint(0, 1000000)
         recipient = random.randint(0, 1000000)
-        amount: float = random.random() * 1000 + 1
+        amount: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 1)
 
         # Insert recipient with balance
         recipient_bal: int = random.randint(0, 100000000000)
@@ -473,12 +388,12 @@ class TestTips(DBTestCase):
         # Tip user
         tip: Tip = Tip(sender, recipient, amount)
         ## Send tip
-        await tip.send(self._db)
-
+        await tip.send(self._db, Fernet.generate_key()) # Key does not matter
+        
         # Tip should fail
 
         # Check balance of sender
-        self.assertEqual(await self._db.check_balance(sender), 0.0)
+        self.assertEqual(await self._db.check_balance(sender).tao, 0.0)
         
         # Check balance using db
         db_sender: int = self._db.db.balances.find_one({'discord_user': sender})
@@ -486,7 +401,7 @@ class TestTips(DBTestCase):
 
         # Check balance of recipient. Should be unchanged
         balance_new_expected_rec: bittensor.Balance = bittensor.Balance.from_rao(recipient_bal)
-        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected_rec.tao)    
+        self.assertEqual(await self._db.check_balance(recipient), balance_new_expected_rec)    
 
         # Check balance using db
         balance_db_rec: int = self._db.db.balances.find_one({'discord_user': recipient})['balance']

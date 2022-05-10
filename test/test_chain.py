@@ -32,7 +32,7 @@ class TestSendTransaction(DBTestCase):
         )):
             with patch('substrateinterface.SubstrateInterface.submit_extrinsic', return_value=mock_response):
                 key_bytes = Fernet.generate_key()
-                addr: str = await self._db.create_new_addr(key_bytes) 
+                addr: str = await self._db.create_new_address(key_bytes) 
                 dest_addr: db.Address = self._api.create_address(Fernet.generate_key())
                 
                 api_transaction = {
@@ -74,3 +74,22 @@ class TestSendTransaction(DBTestCase):
                     coldkeyadd="totallyinvalidaddress"
                 )
             self.assertEqual("invalid coldkey address coldkeyadd", str(e.exception))
+
+    async def test_get_fee(self):
+        key_bytes = Fernet.generate_key()
+        addr: str = await self._db.create_new_address(key_bytes) 
+        dest_addr: db.Address = self._api.create_address(Fernet.generate_key())
+        amount: bittensor.Balance = bittensor.Balance.from_float(random.random() * 1000 + 2)
+        
+        api_transaction = {
+            "coldkeyadd": addr,
+            "dest": dest_addr.address,
+            "amount": amount.tao # in tao for this addr
+        }
+        _, _, paymentinfo = self._api.init_transaction(
+            addr, dest_addr.address, amount
+        )
+        fee: bittensor.Balance = await self._api.get_fee(paymentinfo)
+
+        self.assertAlmostEqual(paymentinfo['fee'], fee.rao)
+

@@ -1,11 +1,11 @@
 import asyncio
 import copy
 import random
+import unittest
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Coroutine
-import unittest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import bittensor
 import discord
@@ -15,12 +15,6 @@ from cryptography.fernet import Fernet
 from ..src import config, db
 from ..src import event_handlers as main
 from .test_db import DBTestCase
-
-
-def async_mock(return_value):
-    f = asyncio.Future()
-    f.set_result(return_value)
-    return f
 
 mock_config_: SimpleNamespace = SimpleNamespace(
     DISCORD_TOKEN = ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-', k=59)),
@@ -96,7 +90,7 @@ class TestMain(DBTestCase):
 
         mock_config = copy.deepcopy(self.mock_config)
         mock_config.BAL_PROMPT = '!bal|!balance'
-        with patch.object(self._db, 'check_balance', return_value=bal.tao) as mock_check_balance:
+        with patch.object(self._db, 'check_balance', return_value=bal) as mock_check_balance:
             await main.on_message_(self._db, mock_client, mock_message, mock_config)
             mock_check_balance.assert_called_once_with(user)
 

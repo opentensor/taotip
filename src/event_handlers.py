@@ -46,7 +46,7 @@ async def on_ready_(client: discord.Client, config: config.Config) -> Tuple[api.
         num_addresses = len(addrs)
         if num_addresses < config.NUM_DEPOSIT_ADDRESSES:
             for _ in tqdm(range(config.NUM_DEPOSIT_ADDRESSES - num_addresses), desc="Creating addresses..."):
-                print(await _db.create_new_addr(config.COLDKEY_SECRET))
+                print(await _db.create_new_address(config.COLDKEY_SECRET))
     except Exception as e:
         print(e)
         print("Can't connect to db...")  
@@ -65,21 +65,7 @@ async def on_ready_(client: discord.Client, config: config.Config) -> Tuple[api.
         # lock all addresses
         await lock_all_addresses(_db, config)
         
-    return _api, _db
-    
-async def lock_all_addresses_and_wait(_db: Database, config: config.Config):
-    assert _db is not None
-    while True:
-        await lock_all_addresses(_db, config)
-        await asyncio.sleep(config.CHECK_ALL_INTERVAL) 
-
-async def lock_all_addresses(_db: Database, config: config.Config):
-    assert _db is not None
-    # lock all addresses
-    addrs: List[str] = await _db.get_all_addresses()
-    for addr in tqdm(addrs, desc="Locking all addresses..."):
-        if (await _db.lock_addr(addr)):
-            await _db.set_lock_expiry(addr, 1)     
+    return _api, _db  
 
 async def on_message_(_db: Database, client: discord.Client, message: discord.Message, config: config.Config):
     assert _db is not None
@@ -98,19 +84,19 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
                 return
             if(validator.is_valid_format(message.content)):
                 sender = message.author
-                amount = parser.get_amount(message.content)
+                amount: Balance = Balance.from_tao(parser.get_amount(message.content))
                 recipient = message.mentions[0]
                 if ((await client.fetch_user(recipient.id)) is None):
                     await channel.send(f"{message.author.mention} {recipient.mention} is not a valid user!")
                     return
                 t = Tip(sender.id, recipient.id, amount)
-                result = await t.send(_db)
+                result = await t.send(_db, config.COLDKEY_SECRET)
                 if (result):
-                    print(f"{sender} tipped {recipient} {amount} tao")
-                    await channel.send(f"{sender.mention} tipped {recipient.mention} {amount} tao")
+                    print(f"{sender} tipped {recipient} {amount.tao} tao")
+                    await channel.send(f"{sender.mention} tipped {recipient.mention} {amount.tao} tao")
                 else:
-                    print(f"{sender} tried to tip {recipient} {amount} tao but failed")
-                    await channel.send(f"{sender.mention} tried to tip {recipient.mention} {amount} tao but failed")
+                    print(f"{sender} tried to tip {recipient} {amount.tao} tao but failed")
+                    await channel.send(f"{sender.mention} tried to tip {recipient.mention} {amount.tao} tao but failed")
 
     elif isinstance(channel, discord.channel.DMChannel):
         # might be deposit, withdraw, help, or balance check
@@ -118,9 +104,9 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
         if (validator.is_help(message.content)):
             await channel.send(config.HELP_STR)
         elif (validator.is_balance_check(message.content)):
-            balance = await _db.check_balance(user.id)
+            balance: Balance = await _db.check_balance(user.id)
             
-            await channel.send(f"Your balance is {balance} tao")
+            await channel.send(f"Your balance is {balance.tao} tao")
         elif (validator.is_deposit_or_withdraw(message.content)):
             amount: float
             if (validator.is_deposit(message.content)):
@@ -139,12 +125,12 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
                 try:
                     await channel.send(f"Remember, withdrawals have a network transfer fee!")
                     deposit_addr = await _db.get_deposit_addr(t)
-                    expiry = _db.get_lock_expiry(deposit_addr)
-                    expiry_delta: datetime.timedelta = expiry - datetime.datetime.now()
-                    expiry_delta = strfdelta(expiry_delta, "%M minutes and %S seconds")
-                    expiry = expiry.astimezone(pytz.timezone("EST"))
-                    expiry_readable = expiry.strftime('%Y-%m-%d %H:%M:%S %Z')
-                    await channel.send(f"Please deposit to {deposit_addr}.\nThis address will be active for another {expiry_delta} until {expiry_readable}.\n")
+                    if (deposit_addr is None):
+                        await channel.send(f"You don't have a deposit address yet. One will be created for you.")
+                        deposit_addr = await _db.create_new_address(config.COLDKEY_SECRET)
+                        # Add to db
+                        await _db.add_deposit_address(user.id, deposit_addr)
+                    await channel.send(f"Please deposit to {deposit_addr}.\nThis address is linked to your discord account.\nOnly you will be able to withdraw from it.")
                 except DepositException as e:
                     await channel.send(f"Error: {e}")
                     return
@@ -192,12 +178,11 @@ async def check_deposit(_db: Database, _api: api.API, client: discord.Client):
                 except Exception as e:
                     print(e, "main.check_deposit", "fetch_user", deposit.user)
                 if user is not None:
-                    new_balance = await _db.check_balance(deposit.user)
-                    await user.send(f"Success! Deposited {deposit.amount} tao.\nYour balance is: {new_balance} tao.")
+                    new_balance: Balance = await _db.check_balance(deposit.user)
+                    await user.send(f"Success! Deposited {deposit.amount} tao.\nYour balance is: {new_balance.tao} tao.")
     print("Done Check")
-    print("Removing old locks from deposit addresses...")
-    # remove old locks
-    await _db.remove_old_locks()
+    print("Removing old deposit checks...")
+    await _db.remove_old_deposit_checks()
     print("Done.")
 
 async def check_deposit_and_wait(_db: Database, _api: api.API, client: discord.Client, config: config.Config):
