@@ -70,7 +70,7 @@ class Database:
         except Exception as e:
             print(e, "db.record_transaction")
 
-    async def get_deposit_addr(self, transaction: 'Transaction', config: Config) -> Optional[str]:
+    async def get_deposit_addr(self, transaction: 'Transaction', key: bytes = None) -> Optional[str]:
         assert self.db is not None
 
         # check if already has an address
@@ -80,7 +80,11 @@ class Database:
 
         if _doc is not None:
             return _doc["address"]
-
+        elif key is not None: # create new address if key is provided
+            # create new address
+            new_addr: str = await self.create_new_address(key, transaction.user)
+            if new_addr is not None:
+                return new_addr
         return None
 
     async def create_new_address(self, key: bytes, user_id: str = None) -> str:
@@ -288,7 +292,7 @@ class Transaction:
     
     async def deposit(self, db: Database, key: bytes) -> float:
         # Get wallet balance
-        addr: Address = await db.get_address_by_user(self.user, key)
+        addr: Address = await db.get_deposit_addr(self)
         if (addr is None):
             raise DepositException(self.user, self.amount, "No address found")
         balance: Balance = await db.api.get_wallet_balance(addr.address)

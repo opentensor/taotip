@@ -49,226 +49,35 @@ class TestDeposit(DBTestCase):
     _api: api.API
     _db: db.Database
 
-    async def test_deposit_with_zero_balance(self):
-        # Create new user with zero balance
-        user: int = random.randint(0, 1000000)
-        amount_: float = random.random() * 1000 + 2.0
-        amount_ = round(amount_, 6)
-        amount: bittensor.Balance = bittensor.Balance.from_float(amount_)
-        # Insert balance doc into db, with 0 balance
-        self._db.db.balances.insert_one({
-            'discord_user': user,
-            'balance': 0
-        })
-
-        # Form transaction
-        transaction: db.Transaction = db.Transaction(
-            user=user,
-            amount=amount.tao
-        )
-
-        # Deposit funds
-        new_balance: float = await transaction.deposit(self._db)
-        # Check balance
-        balance: bittensor.Balance = await self._db.check_balance(user)
-        self.assertEqual(balance, amount)
-        self.assertEqual(new_balance, amount.tao)
-        # Check balance in db
-        balance_doc: Dict = self._db.db.balances.find_one({
-            'discord_user': user
-        })
-        self.assertEqual(balance_doc['balance'], amount.rao)
-        # Check balance in db
-        # Check transaction doc
-        transaction_doc: db.Transaction = self._db.db.transactions.find_one({
-            'user': user
-        })
-
-        self.assertIsNotNone(transaction_doc)
-        self.assertEqual(transaction_doc['user'], user)
-        self.assertEqual(transaction_doc['amount'], amount.rao)  
-
-    async def test_deposit_with_nonzero_balance(self):
-        # Create new user with nonzero balance
-        user: int = random.randint(0, 1000000)
-        user_bal_: float = random.random() * 1000 + 2.0
-        user_bal: bittensor.Balance = bittensor.Balance.from_float(user_bal_)
-        amount_: float = random.random() * 1000 + 2.0
-        amount: bittensor.Balance = bittensor.Balance.from_float(amount_)
-        expected_bal = user_bal + amount
-        # Insert balance doc into db, with 0 balance
-        self._db.db.balances.insert_one({
-            'discord_user': user,
-            'balance': user_bal.rao
-        })
-
-        # Form transaction
-        transaction: db.Transaction = db.Transaction(
-            user=user,
-            amount=amount.tao
-        )
-
-        # Deposit funds
-        new_balance: float = await transaction.deposit(self._db)
-        # Check balance
-        balance: bittensor.Balance = await self._db.check_balance(user)
-        self.assertEqual(balance, expected_bal)
-        self.assertEqual(new_balance, expected_bal.tao)
-        # Check balance in db
-        balance_doc: Dict = self._db.db.balances.find_one({
-            'discord_user': user
-        })
-        self.assertEqual(balance_doc['balance'], expected_bal.rao)
-        # Check balance in db
-        # Check transaction doc
-        transaction_doc: db.Transaction = self._db.db.transactions.find_one({
-            'user': user
-        })
-
-        self.assertIsNotNone(transaction_doc)
-        self.assertEqual(transaction_doc['user'], user)
-        self.assertEqual(transaction_doc['amount'], amount.rao)
-
-    async def test_deposit_with_no_balance_doc(self):
-        # New user would have no balance doc in db
-        # Create new user with zero balance
-        user: int = random.randint(0, 1000000)
-        amount_: float = random.random() * 1000 + 2.0
-        amount_ = round(amount_, 6)
-        amount: bittensor.Balance = bittensor.Balance.from_float(amount_)
-
-        # No balance doc in db
-
-        # Form transaction
-        transaction: db.Transaction = db.Transaction(
-            user=user,
-            amount=amount.tao
-        )
-
-        # Deposit funds
-        new_balance: float = await transaction.deposit(self._db)
-        # Check balance
-        balance: bittensor.Balance = await self._db.check_balance(user)
-        self.assertEqual(balance, amount)
-        self.assertEqual(new_balance, amount.tao)
-        # Check balance in db
-        balance_doc: Dict = self._db.db.balances.find_one({
-            'discord_user': user
-        })
-        self.assertEqual(balance_doc['balance'], amount.rao)
-        # Check balance in db
-        # Check transaction doc
-        transaction_doc: db.Transaction = self._db.db.transactions.find_one({
-            'user': user
-        })
-
-        self.assertIsNotNone(transaction_doc)
-        self.assertEqual(transaction_doc['user'], user)
-        self.assertEqual(transaction_doc['amount'], amount.rao)  
-
-    def test_deposit_outside_expiry(self):
-        # TODO: test depositing an amount after the expiry has ended
-        ## Test more than one deposit after the expiry
-        self.assert_(False)
-
-    def test_deposit_with_expiry(self):
-        # TODO: test depositing an amount before the expiry has ended
-        ## Test more than one deposit during the time
-        self.assert_(False)
-
-    def test_deposit_no_addresses(self):
-        # TODO: test depositing an amount with no deposit addresses in db
-        self.assert_(False)
-
-    async def test_check_for_deposits(self):
+    async def test_get_deposit_address(self):
         key_bytes: bytes = Fernet.generate_key()
-        # Check deposits with no deposits
-        deposits: List[db.Transaction] = await self._api.check_for_deposits(self._db)
-        self.assertEqual(deposits, [])
+        user: str = str(random.randint(0, 1000000))
+        # Create a new address for the user
+        new_address: str = await self._db.create_new_address(key_bytes, user)
 
-        # Create 3 addresses
-        addresses: List[str] = []
-        new_balances: Dict[str, bittensor.Balance] = {}
-        for _ in range(3):
-            addresses.append(await self._db.create_new_address(key_bytes))
-            # Update address doc in db, with 0 balance
-            self._db.db.addresses.update_one({
-                'address': addresses[-1]
-            }, {
-                '$set': {
-                    'balance': 0
-                }
-            })
-            new_balances[addresses[-1]] = bittensor.Balance.from_float(random.random() * 1000 + 2.0)
+        # Form transaction
+        transaction: db.Transaction = db.Transaction(
+            user,
+            bittensor.Balance.from_float(random.random() * 10000 + 2.0).tao
+        )
+        # Get address for user
+        address: str = await self._db.get_deposit_addr(transaction)
+        self.assertEqual(address, new_address)
+
+    async def test_get_deposit_address_not_in_db(self):
+        key_bytes: bytes = Fernet.generate_key()
+        user: str = str(random.randint(0, 1000000))
+        # User is not yet in DB
+
+        # Form transaction
+        transaction: db.Transaction = db.Transaction(
+            user,
+            bittensor.Balance.from_float(random.random() * 10000 + 2.0).tao
+        )
+        # Get address for user
+        address: str = await self._db.get_deposit_addr(transaction, key_bytes)
+        self.assertIsNotNone(address)
         
-        # Check deposits with no deposits
-        deposits: List[db.Transaction] = await self._api.check_for_deposits(self._db)
-        self.assertEqual(deposits, [])
-    
-        def mock_get_balance(address: str) -> bittensor.Balance:
-            return new_balances[address]
-
-        with patch('bittensor.Subtensor.get_balance', side_effect=mock_get_balance):
-            # Simulate deposits
-            users = [
-                random.randint(0, 1000000),
-                random.randint(0, 1000000),
-                random.randint(0, 1000000)
-            ]
-            addrs_for_users: Dict[int, str] = {}
-            for user in users:
-                transaction: db.Transaction = db.Transaction(
-                    user=user,
-                    amount=new_balances[addresses[0]].tao
-                )
-                addr_for_user: str = await self._db.get_deposit_addr(transaction, mock_config)
-                self.assertIsNotNone(addr_for_user)
-                addrs_for_users[user] = addr_for_user
-
-            # Check deposits
-            deposits: List[db.Transaction] = await self._api.check_for_deposits(self._db)
-            for deposit in deposits:
-                self.assertIn(deposit.user, users)      
-                addr_: str = addrs_for_users[deposit.user]          
-                self.assertEqual(deposit.amount, new_balances[addr_].tao)
-
-    def test_check_for_deposits_with_no_addresses(self):
-        # TODO: test checking for deposits with no addresses in db
-        self.assert_(False)
-
-    def test_check_for_deposits_with_no_deposits(self):
-        # TODO: test checking for deposits with no deposits made
-        self.assert_(False)
-
-    async def test_get_deposit_addresses(self):
-        key_bytes: bytes = Fernet.generate_key()
-        # Create a few new addresess
-        addresses: Set[str] = set()
-        for _ in range(0, 10):
-            addr: str = await self._db.create_new_address(key_bytes)
-            addresses.add(addr)
-
-        # Get addresses
-        ## Each address should be in the set
-        ## Only one address per unique user
-        seen_addr: Set[str] = set()
-        users = set()
-        for _ in range(0, 10):
-            # Create new user
-            user: int = random.randint(0, 1000000)
-            while user in users:
-                user = random.randint(0, 1000000)
-            users.add(user)
-
-            # Form transaction
-            transaction: db.Transaction = db.Transaction(
-                user=user,
-                amount=0
-            )
-            deposit_addr: Set[str] = await self._db.get_deposit_addr(transaction, mock_config)
-            seen_addr.add(deposit_addr)
-
-        self.assertEqual(seen_addr, addresses)
 
 class TestWithdraw(DBTestCase):
     """ Test withdrawing funds while mocking the blockchain. 

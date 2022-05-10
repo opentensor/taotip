@@ -127,7 +127,7 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
                     deposit_addr = await _db.get_deposit_addr(t)
                     if (deposit_addr is None):
                         await channel.send(f"You don't have a deposit address yet. One will be created for you.")
-                        deposit_addr = await _db.create_new_address(config.COLDKEY_SECRET)
+                        deposit_addr = await _db.get_deposit_addr(t, config.COLDKEY_SECRET)
                         # Add to db
                         await _db.add_deposit_address(user.id, deposit_addr)
                     await channel.send(f"Please deposit to {deposit_addr}.\nThis address is linked to your discord account.\nOnly you will be able to withdraw from it.")
@@ -156,42 +156,3 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
                 print(f"{user} tried to modify balance by {amount} tao but failed")
         else:
             await channel.send(config.HELP_STR)
-
-async def check_deposit(_db: Database, _api: api.API, client: discord.Client):
-    if client is None:
-        return
-    assert _db is not None
-    assert _api is not None
-
-    # check for deposits
-    try:
-        deposits: List[Transaction] = await _api.check_for_deposits(_db)
-    except WebSocketException as e:
-        print(e)
-        return
-
-    if (len(deposits) > 0):
-        for deposit in tqdm(deposits, desc="Depositing..."):
-            if deposit.amount > 0.0:
-                try:
-                    user = await client.fetch_user(deposit.user)
-                except Exception as e:
-                    print(e, "main.check_deposit", "fetch_user", deposit.user)
-                if user is not None:
-                    new_balance: Balance = await _db.check_balance(deposit.user)
-                    await user.send(f"Success! Deposited {deposit.amount} tao.\nYour balance is: {new_balance.tao} tao.")
-    print("Done Check")
-    print("Removing old deposit checks...")
-    await _db.remove_old_deposit_checks()
-    print("Done.")
-
-async def check_deposit_and_wait(_db: Database, _api: api.API, client: discord.Client, config: config.Config):
-    if client is None:
-        return
-    assert _db is not None
-    assert _api is not None
-
-    while True:
-        await check_deposit(_db, _api, client)
-        # done, await for time
-        await asyncio.sleep(config.DEPOSIT_INTERVAL)
