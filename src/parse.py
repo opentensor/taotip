@@ -1,6 +1,9 @@
 import re
-from . import config
+
 from substrateinterface.utils import ss58
+
+from . import config
+
 
 def is_valid_ss58_address(addr: str, format: int) -> bool:
     try:

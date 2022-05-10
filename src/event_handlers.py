@@ -1,12 +1,8 @@
-import asyncio
-import datetime
 from string import Template
-from types import SimpleNamespace
-from typing import Coroutine, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import discord
 import pymongo
-import pytz
 from bittensor import Balance
 from tqdm import tqdm
 from websocket import WebSocketException
@@ -61,9 +57,6 @@ async def on_ready_(client: discord.Client, config: config.Config) -> Tuple[api.
                 balance += _balance
 
             print(f"Wallet Balance: {balance}")
-
-        # lock all addresses
-        await lock_all_addresses(_db, config)
         
     return _api, _db  
 
