@@ -146,17 +146,16 @@ class API:
             is_valid = substrate.is_valid_ss58_address(coldkeyadd)
             return is_valid
 
-    async def find_withdraw_address(self, _db: Database, transaction: Transaction, key: bytes) -> Tuple[Optional[str], float]:
+    async def find_withdraw_address(self, _db: Database, transaction: Transaction, key: bytes) -> Tuple[Optional[str], bittensor.Balance]:
         """
         Finds valid withdraw addresses with available balance.
         """
-        addr: Address = _db.get_address_by_user(transaction.user, key)
+        addr: Address = _db.get_address_by_user(transaction.user)
         if not addr:
             return None, 0.0
 
         withdraw_addr = addr.address
-        balance_: 'bittensor.Balance' = self.get_wallet_balance(withdraw_addr)
-        balance: float = balance_.tao
+        balance: bittensor.Balance = self.get_wallet_balance(withdraw_addr)
         return withdraw_addr, balance
             
     async def sign_transaction(self, _db: Database, transaction: Dict, addr: str, key: bytes) -> Dict:
@@ -208,7 +207,7 @@ class API:
         fee = await self.get_fee(
             transaction["coldkeyadd"],
             transaction["dest"],
-            bittensor.Balance.from_tao(transaction["dest"])
+            bittensor.Balance.from_tao(transaction["amount"])
         )
 
         return fee

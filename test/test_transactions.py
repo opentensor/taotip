@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import bittensor
 from cryptography.fernet import Fernet
+from more_itertools import side_effect
 from scalecodec.base import ScaleBytes
 from substrateinterface import Keypair
 
@@ -88,75 +89,72 @@ class TestWithdraw(DBTestCase):
     _db: db.Database
 
     async def test_withdraw_with_zero_balance(self):
+        key_bytes: bytes = Fernet.generate_key()
         user: int = random.randint(0, 1000000)
-        # Insert balance doc into db, with 0 balance
-        self._db.db.balances.insert_one({
-            'discord_user': user,
-            'balance': 0
-        })
+
+        # Create a new address for the user
+        new_address: str = await self._db.create_new_address(key_bytes, user)
+
+        # User now in db. Should have 0 balance on chain
 
         # Attempt to withdraw
         amount: float = random.random() * 10000 + 2
         coldkeyadd: str = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
-        key_bytes: bytes = Fernet.generate_key() # doens't matter because it should stop before it gets here
         ## Create Transaction
         transaction: db.Transaction = db.Transaction(str(user), amount)
         with self.assertRaises(db.WithdrawException):
-            await transaction.withdraw(self._db, coldkeyadd, key_bytes)
+            with patch.object(self._api, 'get_wallet_balance', return_value=bittensor.Balance.from_rao(0)): # 0 balance
+                await transaction.withdraw(self._db, coldkeyadd, key_bytes)
         
         # Check that balance is still 0
         balance: bittensor.Balance = await self._db.check_balance(user)
         self.assertEqual(balance.tao, 0)
 
     async def test_withdraw_with_nonzero_balance_not_enough(self):   
+        key_bytes: bytes = Fernet.generate_key()
         user: int = random.randint(0, 1000000)
+
+        
         amount: float = random.random() * 10000 + 2
-        key_bytes: bytes = Fernet.generate_key() # doens't matter because it should stop before it gets here 
+        key_bytes: bytes = Fernet.generate_key() 
 
         # More than transaction fee, but not enough to cover transaction
         bal: bittensor.Balance = bittensor.Balance.from_float(1.0)
-        # Insert balance doc into db, with balance
-        self._db.db.balances.insert_one({
-            'discord_user': user,
-            'balance': bal.rao
-        })
-
-        # Check that balance is in db
-        balance: bittensor.Balance = await self._db.check_balance(user)
-        self.assertEqual(balance, bal)
-
-        # Attempt to withdraw        
-        coldkeyadd: str = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
         
-        ## Create Transaction
-        transaction: db.Transaction = db.Transaction(str(user), amount)
-        with self.assertRaises(db.WithdrawException):
-            await transaction.withdraw(self._db, coldkeyadd, key_bytes)
-        
-        # Check that balance is unchanged
-        balance: bittensor.Balance = await self._db.check_balance(user)
-        self.assertEqual(balance, bal)
+        # Create a new address for the user
+        new_address: str = await self._db.create_new_address(key_bytes, user)
 
-    async def test_withdraw_with_no_balance_doc(self):
+        # Mock balance check on chain
+        with patch.object(self._api, 'get_wallet_balance', return_value=bal):
+            # Check that balance is in db
+            balance: bittensor.Balance = await self._db.check_balance(user)
+            self.assertEqual(balance, bal)
+
+            # Attempt to withdraw        
+            coldkeyadd: str = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
+            
+            ## Create Transaction
+            transaction: db.Transaction = db.Transaction(str(user), amount)
+            with self.assertRaises(db.WithdrawException):
+                await transaction.withdraw(self._db, coldkeyadd, key_bytes)
+            
+            # Check that balance is unchanged
+            balance: bittensor.Balance = await self._db.check_balance(user)
+            self.assertEqual(balance, bal)
+
+    async def test_withdraw_with_no_user_address(self):
         user: int = random.randint(0, 1000000)
         # Insert address doc into db        
-        key_bytes: bytes = Fernet.generate_key() # doens't matter because it should stop before it gets here
-        ## Create tip bot address
-        addr: str = await self._db.create_new_address(key_bytes) 
-        ## Amount to withdraw
-        amount: float = random.random() * 10000 + 2
-        ## Tip bot address balance
-        addr_bal: float = bittensor.Balance.from_float(amount + 20.0).rao
-        ## Make tip bot address doc have positive balance
-        self._db.db.addresses.update_one({
-            'address': addr,
-        }, {
-            '$set': {
-                'balance': addr_bal
-            }
-        })      
+        key_bytes: bytes = Fernet.generate_key() # doesn't matter because it should stop before it gets here
+        
+        # User is not in db
 
-        # No balance doc in db
+        ## Amount to withdraw
+        amount: float = random.random() * 10000 + 2 
+
+        # Check that balance is 0; should be because user is not in db
+        balance: bittensor.Balance = await self._db.check_balance(user)
+        self.assertEqual(balance.tao, 0)
 
         # Attempt to withdraw        
         ## User destination address
@@ -166,42 +164,9 @@ class TestWithdraw(DBTestCase):
         with self.assertRaises(db.WithdrawException):
             await transaction.withdraw(self._db, coldkeyadd, key_bytes)
         
-        # Check that balance is still not in db
-        user_db: Dict = self._db.db.balances.find_one({'discord_user': user})
-        self.assertIsNone(user_db)
-
-        # Check that tip bot addr balance is unchanged
-        addr_db: Dict = self._db.db.addresses.find_one({'address': addr})
-        self.assertEqual(addr_db['balance'], addr_bal)
-
-    async def test_withdraw_no_addresses(self):
-        user: int = random.randint(0, 1000000)
-        bal: bittensor.Balance = bittensor.Balance.from_float(random.random() * 10000 + 2.0)
-        # Insert balance doc into db, with positive balance
-        self._db.db.balances.insert_one({
-            'discord_user': str(user),
-            'balance': bal.rao
-        })
-
-        # No addresses in db
-
-        # Attempt to withdraw
-        amount: float = bal.tao - 1.0 # fee should be below 1.0 tao
-        coldkeyadd: str = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
-        key_bytes: bytes = Fernet.generate_key() # doens't matter because it should stop before it gets here
-        ## Create Transaction
-        transaction: db.Transaction = db.Transaction(str(user), amount)
-
-        # Should fail
-        with self.assertRaises(db.WithdrawException) as e:
-            await transaction.withdraw(self._db, coldkeyadd, key_bytes)
-        
-        # Verify right exception
-        self.assertIn(e.exception.reason, 'No withdraw addresses found')
-        
-        # Check that balance is unchanged
-        balance: bittensor.Balance = await self._db.check_balance(str(user))
-        self.assertEqual(balance, bal)
+        # Check that balance is still 0
+        balance: bittensor.Balance = await self._db.check_balance(user)
+        self.assertEqual(balance.tao, 0)
 
     async def test_sign_transaction(self):
         key_bytes: bytes = Fernet.generate_key()
@@ -247,44 +212,36 @@ class TestWithdraw(DBTestCase):
         amount: float = random.random() * 10000 + 2
         key_bytes: bytes = Fernet.generate_key()
         user_bal: bittensor.Balance = bittensor.Balance.from_float(amount + 20.0)
+        
+        coldkeyadd: str = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
 
-        # Insert balance doc into db, with balance >= amount + fee
-        self._db.db.balances.insert_one({
-            'discord_user': user,
-            'balance': user_bal.rao
-        })
+        # Create a new address for the user
+        new_address: str = await self._db.create_new_address(key_bytes, user)
 
-        # Check that balance is in db
-        balance: bittensor.Balance = await self._db.check_balance(user)
-        self.assertEqual(balance, user_bal)
+        ## Create Transaction
+        transaction: db.Transaction = db.Transaction(user, amount)
+        api_transaction = {
+            "coldkeyadd": new_address,
+            "dest": coldkeyadd,
+            "amount": amount # in tao for this addr
+        }
 
-        # Create address on db
-        addr: str = await self._db.create_new_address(key_bytes)
-        # Make the address have enough balance
-        addr_balance: bittensor.Balance = bittensor.Balance.from_float(amount + 20.0)
-        self._db.db.addresses.update_one({
-            'address': addr,
-        }, {
-            '$set': {
-                'balance': addr_balance.rao
-            }
-        })
+        # User now in db. Should have 0 balance on chain
+        # Expected user_bal after withdrawal        
+        expected_balance: bittensor.Balance = user_bal - (await self._api.get_withdraw_fee(api_transaction)) - bittensor.Balance.from_float(amount)
 
-        # Check addr balance is in db
-        addr_db: Dict = self._db.db.addresses.find_one({'address': addr})
-        self.assertEqual(addr_db['balance'], addr_balance.rao)
+        ## Mock balance check on chain
+        with patch.object(self._api, 'get_wallet_balance', side_effect=[
+            user_bal, user_bal, user_bal, expected_balance, expected_balance
+        ]):
+            # Check balance using mock chain
+            balance: bittensor.Balance = await self._db.check_balance(user)
+            self.assertEqual(balance, user_bal)
 
-        # Check addr is not locked
-        self.assertFalse(addr_db['locked'])
+            # Check new address is in db
+            addr_db: Dict = self._db.db.addresses.find_one({'address': new_address})
+            self.assertEqual(addr_db['user'], user)
 
-        # Expected addr_balance after withdrawal        
-        expected_addr_balance: bittensor.Balance = addr_balance - bittensor.Balance.from_float(-(await self._api.get_withdraw_fee()) - amount)
-
-        # Setup mock balance check
-        ## Check for get withdraw addr, check for send, check for get after send
-        with patch('bittensor.Subtensor.get_balance', side_effect=[
-            addr_balance, addr_balance, expected_addr_balance
-        ]):       
             # Setup mock send transaction
             mock_response: SimpleNamespace = SimpleNamespace(
                 process_events=MagicMock(return_value=None),
@@ -292,19 +249,13 @@ class TestWithdraw(DBTestCase):
             )
             with patch('substrateinterface.SubstrateInterface.submit_extrinsic', MagicMock(return_value=mock_response)):
                 # Attempt to withdraw
-                coldkeyadd: str = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
-                ## Create Transaction
-                transaction: db.Transaction = db.Transaction(user, amount)
+
                 new_balance: float = await transaction.withdraw(self._db, coldkeyadd, key_bytes)
                 new_balance = bittensor.Balance.from_float(new_balance)
-                # Check that the balance is correct
-                expected_balance: bittensor.Balance = user_bal - bittensor.Balance.from_float((await self._api.get_withdraw_fee()) + amount)
+                
+                # Check that new balance on chain matches expected balance
                 self.assertEqual(new_balance, expected_balance)
 
-                # Check that balance is in db
+                # Check that balance on chain matches expected balance
                 balance: bittensor.Balance = await self._db.check_balance(user)
                 self.assertEqual(balance, expected_balance)
-
-                # Check that addr balance is in db
-                addr_db: Dict = self._db.db.addresses.find_one({'address': addr})
-                self.assertEqual(addr_db['balance'], expected_addr_balance.rao)

@@ -255,23 +255,25 @@ class Transaction:
 
         if not db.api.verify_coldkeyadd(coldkeyadd):
             raise WithdrawException(coldkeyadd, self.amount, "withdraw coldkeyadd invalid")
-       
-        withdraw_addr, amount = await db.api.find_withdraw_address(db, self, key)
 
-        # gets balance in tao (float)
-        balance: Balance = await db.api.get_wallet_balance(withdraw_addr)
+        balance: Balance
+        withdraw_addr, balance = await db.api.find_withdraw_address(db, self, key)
+
+        if withdraw_addr is None:
+            raise WithdrawException(coldkeyadd, self.amount, "user address not found")
+
         if (balance.tao < self.amount):
             raise WithdrawException(coldkeyadd, self.amount, f"Balance {balance.tao} too low to withdraw {self.amount}")        
 
         api_transaction = {
             "coldkeyadd": withdraw_addr,
             "dest": coldkeyadd,
-            "amount": amount # in tao for this addr
+            "amount": self.amount # in tao for this addr
         }
 
         withdraw_fee: Balance = await db.api.get_withdraw_fee(api_transaction)
 
-        if (balance < self.amount + withdraw_fee.tao):
+        if (balance.tao < self.amount + withdraw_fee.tao):
             raise WithdrawException(coldkeyadd, self.amount, f"Balance {balance.tao} too low to withdraw {self.amount} for fee: {withdraw_fee.tao} tao")
         self.fee = withdraw_fee.tao
 
