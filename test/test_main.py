@@ -135,7 +135,7 @@ class TestMain(DBTestCase):
 
         mock_config = copy.deepcopy(self.mock_config)
         mock_config.BAL_PROMPT = '!bal|!balance'
-        with patch.object(self._db, 'check_balance', return_value=bal.tao) as mock_check_balance:
+        with patch.object(self._db, 'check_balance', return_value=bal) as mock_check_balance:
             await main.on_message_(self._db, mock_client, mock_message, mock_config)
             mock_check_balance.assert_called_once_with(user)
 
@@ -285,7 +285,7 @@ class TestMain(DBTestCase):
         mock_config.PROMPT = '!tip'
         with patch.object(db.Tip, '__new__', return_value=mock_tip) as mock_tip_new:
             await main.on_message_(self._db, mock_client, mock_message, mock_config)
-            mock_tip_new.assert_called_once_with(db.Tip, user, recipient, amount.tao)
+            mock_tip_new.assert_called_once_with(db.Tip, user, recipient, amount)
             mock_tip_send.assert_called_once() # Someone tipped someone...
 
     async def test_help(self):

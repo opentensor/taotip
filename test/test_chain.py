@@ -89,7 +89,7 @@ class TestSendTransaction(DBTestCase):
         _, _, paymentinfo = self._api.init_transaction(
             addr, dest_addr.address, amount
         )
-        fee: bittensor.Balance = await self._api.get_fee(paymentinfo)
+        fee: bittensor.Balance = await self._api.get_fee(addr, dest_addr.address, amount)
 
-        self.assertAlmostEqual(paymentinfo['fee'], fee.rao)
+        self.assertAlmostEqual(paymentinfo['partialFee'], fee.rao)
 
