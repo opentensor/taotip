@@ -10,6 +10,8 @@ import _ from 'lodash';
 
 import router from './routes.js';
 
+const app = express();
+
 const scopes = ['identify', 'email', 'guilds', 'guilds.join'];
 
 passport.serializeUser(function(user, done) {
