@@ -22,24 +22,15 @@ services:
       - taotip_data_container:/data/taotip
     depends_on:
       - mongodb
-  backend:
-    container_name: backend
+  export-service:
+    container_name: export-service
     build:
-      context: ./taotip-export/backend
+      context: ./taotip-export/
       dockerfile: Dockerfile
     ports:
       - 5000:5000
     depends_on:
       - mongodb
-  frontend:
-    container_name: frontend
-    build:
-      context: ./taotip-export/frontend
-      dockerfile: Dockerfile
-    ports:
-      - 80:3000
-    depends_on:
-      - backend
     
 volumes:
   mongodb_data_container:
