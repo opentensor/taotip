@@ -88,14 +88,21 @@ app.get('/auth/discord/callback', passport.authenticate('discord', {
     return res.redirect('/export') // Successful auth, redirect to export page
 });
 
-// Catch all other routes and return 404 if not a valid page
+// Forward to index.html if a valid page
 app.get('*', (req, res) => {
-    pages = [
+    const pages = [
         '/', '/export'
     ]
-    if (pages.indexOf(req.path) === -1) {
-        res.status(404).json('Not Found');
+    if (pages.indexOf(req.path) === 1) {
+        return res.sendFile(`/app/build/index.html`);
     }
+});
+
+// Catch all other routes return 404
+app.all('*', (req, res) => {
+    res.status(404).json({
+        error: 'Not Found'
+    });
 });
 
 try {
