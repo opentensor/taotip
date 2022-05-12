@@ -7,12 +7,13 @@ import MongoStore from 'connect-mongo';
 import mongoose from 'mongoose';
 import Address from './Address.js';
 import _ from 'lodash';
+import cors from 'cors';
 
 import router from './routes.js';
 
 const app = express();
 
-const scopes = ['identify', 'email', 'guilds', 'guilds.join'];
+const scopes = ['identify'];
 
 passport.serializeUser(function(user, done) {
     done(null, user);
@@ -34,8 +35,11 @@ passport.use(new DiscordStrategy({
             if (err || !address) {
                 cb(err);
             }
-            const addr = _.omit(addr, ['_id', '__v', 'mnemonic']);
-            cb(err, address);
+            const addr = _.omit(address, ['_id', '__v', 'mnemonic']);
+            if (process.env.TESTING) {
+                console.log(`User with id ${profile.id} logged in. Address: ${addr.address}`);
+            }
+            cb(err, addr);
         });
     }
 ));
@@ -52,16 +56,47 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+if (process.env.NODE_ENV === 'development' || process.env.TESTING) {
+    const corsOptions = {
+        origin: function(origin, cb) {
+            const whitelist = [
+                'http://localhost:5000',
+            ]
+
+            // check if the request is from a origin in whitelist
+            if (!origin || whitelist.indexOf(origin) !== -1) {
+                cb(null, true)
+            } else {
+                cb(new Error('Not allowed by CORS'))
+            }
+        },
+        credentials: true,
+    }
+
+    app.use(cors(corsOptions))
+} else {
+    app.use(cors())
+}
+
 app.use('/', express.static("build"));
+app.use('/api/', router);
 
 app.get('/auth/discord', passport.authenticate('discord'));
 app.get('/auth/discord/callback', passport.authenticate('discord', {
     failureRedirect: '/'
 }), function(req, res) {
-    res.redirect('/export') // Successful auth
+    return res.redirect('/export') // Successful auth, redirect to export page
 });
 
-app.use('/export', router);
+// Catch all other routes and return 404 if not a valid page
+app.get('*', (req, res) => {
+    pages = [
+        '/', '/export'
+    ]
+    if (pages.indexOf(req.path) === -1) {
+        res.status(404).json('Not Found');
+    }
+});
 
 try {
     const mongo_uri = process.env.TESTING ? process.env.MONGODB_URI_TEST : process.env.MONGODB_URI;

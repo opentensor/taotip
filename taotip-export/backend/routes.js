@@ -6,10 +6,10 @@ import { Keyring } from '@polkadot/keyring';
 
 const Address = mongoose.model('Address');
 
-// /export endpoint
+// /api endpoint
 const router = express.Router();
 
-router.post('/', checkAuth, async(req, res) => {
+router.post('/export', checkAuth, async(req, res) => {
     // Should be authenticated with Discord
     // req.user contains the address from db
     try {
