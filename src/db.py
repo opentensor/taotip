@@ -315,7 +315,7 @@ class Address:
     @staticmethod
     def __unencrypt(mnemonic_encrypted: bytes, key: bytes) -> str:
         cipher_suite = Fernet(key)
-        unciphered_text = (cipher_suite.decrypt(mnemonic_encrypted))
+        unciphered_text = cipher_suite.decrypt(mnemonic_encrypted)
         return str(unciphered_text, "utf-8")
 
     @staticmethod

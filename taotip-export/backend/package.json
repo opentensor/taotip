@@ -9,6 +9,8 @@
         "start": "nodemon index.js"
     },
     "dependencies": {
+        "@polkadot/keyring": "^9.1.1",
+        "@polkadot/util-crypto": "^9.1.1",
         "connect-mongo": "^4.6.0",
         "cors": "^2.8.5",
         "dotenv": "^16.0.1",
@@ -19,7 +21,6 @@
         "mongoose": "^6.3.3",
         "nodemon": "^2.0.16",
         "passport": "^0.5.2",
-        "passport-discord": "^0.1.4",
-        "@polkadot/keyring": "^9.1.1"
+        "passport-discord": "^0.1.4"
     }
 }
