@@ -34,9 +34,10 @@ def main() -> None:
         await event_handlers.on_message_(_db, client, message, config)
 
     async def welcome_new_users(_db: Database, client: discord.Client, config: Config):
-        await event_handlers.welcome_new_users(_db, client, config)
-        # sleep until next check
-        await asyncio.sleep(config.NEW_USER_CHECK_INTERVAL)
+        while True:
+            await event_handlers.welcome_new_users(_db, client, config)
+            # sleep until next check
+            await asyncio.sleep(config.NEW_USER_CHECK_INTERVAL)
 
     client.run(config.DISCORD_TOKEN)
     
