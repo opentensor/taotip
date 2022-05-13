@@ -23,6 +23,7 @@ class Config:
         TESTING: bool
         NUM_DEPOSIT_ADDRESSES: int
         HELP_STR: str
+        NEW_USER_CHECK_INTERVAL: int
         def __init__(self, *args):
             if len(args) == 1:
                     if isinstance(args[0], SimpleNamespace):
@@ -58,7 +59,8 @@ main_config_ = SimpleNamespace(
         HELP_STR="To get your balance, type: `!balance` or `!bal`\n" + \
                 "To deposit tao, type: `!deposit`\n" + \
                 "To withdraw your tao, type: `!withdraw <address> <amount>`\n" + \
-                f"For help, type: `!h` or `!help` or contact <maintainer>n"
+                f"For help, type: `!h` or `!help` or contact <maintainer>n",
+        NEW_USER_CHECK_INTERVAL=10.0 # seconds
 )
 main_config_.WIT_PROMPT = main_config_.WIT_PROMPT.replace('<currency>', main_config_.CURRENCY)
 main_config_.HELP_STR = main_config_.HELP_STR.replace('<maintainer>', main_config_.MAINTAINER)
