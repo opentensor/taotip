@@ -1,5 +1,5 @@
 # Invite
- [Invite the bot to your server!](https://discord.com/api/oauth2/authorize?client_id=323594922584440832&permissions=274877975616&scope=bot)
+ [Invite the bot to your server!](https://discord.com/api/oauth2/authorize?client_id=974705171772870698&permissions=274877975616&scope=bot)
 
 # Run Yourself
 ## Requirements
