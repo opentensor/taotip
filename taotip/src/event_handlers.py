@@ -142,3 +142,15 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
                 print(f"{user} tried to modify balance by {amount} tao but failed")
         else:
             await channel.send(config.HELP_STR)
+
+async def welcome_new_users( _db: Database, client: discord.Client, config: config.Config):
+    if (_db is None):
+        return
+
+    users: List[str] = await _db.get_unwelcomed_users()
+    for user in users:
+        discord_user = await client.fetch_user(int(user))
+        await discord_user.send(f"""Welcome! You can deposit or withdraw tao using the following commands:\n{config.HELP_STR}
+        \n\nPlease backup your mnemonic on the following website: https://taotip.opentensor.ai/""")
+        await _db.set_welcomed_user(user, True)
+

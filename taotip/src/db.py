@@ -90,7 +90,8 @@ class Database:
         doc: Dict = {
             "address": new_address.address,
             "mnemonic": new_address.get_encrypted_mnemonic(),
-            "user": None
+            "user": None,
+            "welcomed": False,
         }
 
         try:
@@ -206,6 +207,36 @@ class Database:
                 })
         else:
             raise Exception("Address not found")
+
+    async def set_welcomed_user(self, user: str, welcomed: bool) -> None:
+        assert self.db is not None
+
+        try:
+            self.db.addresses.update_one({
+                "user": str(user)
+            }, {
+                "$set": {
+                    "welcomed": welcomed
+                }
+            })
+        except Exception as e:
+            print(e)
+
+    async def get_unwelcomed_users(self) -> List[str]:
+        assert self.db is not None
+
+        query: Dict = {
+            "welcomed": False
+        }
+
+        try:
+            doc: Dict = self.db.addresses.find(query)
+            users: List[str] = [_doc["user"] for _doc in doc]
+            return users
+        except Exception as e:
+            print(e)
+            return []            
+
 class Tip:
     time: datetime = None
     amount: Balance = None
