@@ -16,7 +16,7 @@ router.post("/export", checkAuth, async(req, res) => {
     // req.user contains the address from db
     try {
         const address = await Address.findOne({
-            address: req.user.address,
+            user: req.user.user,
         });
 
         if (!address) {
@@ -41,12 +41,6 @@ router.post("/export", checkAuth, async(req, res) => {
         const mnemonic = await decrypt(encrypted_mnemonic);
         
         const pair = keyring.addFromMnemonic(mnemonic, { name: "taotip_export" });
-        const address_to_export = pair.address;
-        if (address_to_export !== req.user.address) {
-            return res.status(500).json({
-                error: "Server error",
-            });
-        }
 
         return res.json(pair.toJson(password));
     } catch (err) {

@@ -54,7 +54,7 @@ class Database:
         assert self.db is not None
         new_doc: Dict = {
             "amount": Balance.from_tao(transaction.amount).rao,
-            "user": transaction.user,
+            "user": str(transaction.user),
             "time": transaction.time
         }
         
@@ -71,7 +71,7 @@ class Database:
 
         # check if already has an address
         _doc: Dict = self.db.addresses.find_one({
-            "user": transaction.user
+            "user": str(transaction.user)
         })
 
         if _doc is not None:
@@ -133,7 +133,7 @@ class Database:
         assert self.db is not None
 
         query: Dict = {
-            "user": user
+            "user": str(user)
         }
 
         try:
@@ -201,7 +201,7 @@ class Database:
                     "address": addr,
                 }, {
                     "$set": {
-                        "user": user
+                        "user": str(user)
                     }
                 })
         else:
