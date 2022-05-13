@@ -1,6 +1,5 @@
 __pycache__
 .gitignore
+.dockerignore
 Dockerfile
-README.md
-LICENSE
 test

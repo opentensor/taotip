@@ -16,7 +16,7 @@ services:
   taotip:
     container_name: taotip
     build:
-      context: .
+      context: ./taotip/
       dockerfile: Dockerfile
     volumes:
       - taotip_data_container:/data/taotip

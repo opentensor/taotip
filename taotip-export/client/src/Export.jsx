@@ -37,18 +37,22 @@ function Export() {
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);       
-            } else if (response.status === 404) {
-                // User not found in the database
-                setError(true);
-                setErrorText("User not found");
-            } else {
-                // error
-                throw new Error(`status: ${response.status}; ${response.data.error}`);
             }
         } catch (error) {
-            console.log("Error", error);
-            setError(true);
+            setError(true);            
             setErrorText("Unknown Error");
+            if (error.response) {
+                
+                if (error.response?.status === 404) {
+                    // User not found in the database
+                    
+                    setErrorText("No address for this user");
+                } else {
+                    console.error(`status: ${error.response.status}; ${error.response.data.error}`);
+                }
+            } else {
+                console.error("Error", error);
+            }
         }
     };
 

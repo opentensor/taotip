@@ -38,11 +38,6 @@ async def on_ready_(client: discord.Client, config: config.Config) -> Tuple[api.
     try:
         mongo_uri = config.MONGO_URI_TEST if config.TESTING else config.MONGO_URI
         _db = Database(pymongo.MongoClient(mongo_uri), _api, config.TESTING)
-        addrs: List[str] = list(await _db.get_all_addresses())
-        num_addresses = len(addrs)
-        if num_addresses < config.NUM_DEPOSIT_ADDRESSES:
-            for _ in tqdm(range(config.NUM_DEPOSIT_ADDRESSES - num_addresses), desc="Creating addresses..."):
-                print(await _db.create_new_address(config.COLDKEY_SECRET))
     except Exception as e:
         print(e)
         print("Can't connect to db...")  
@@ -121,8 +116,6 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
                     if (deposit_addr is None):
                         await channel.send(f"You don't have a deposit address yet. One will be created for you.")
                         deposit_addr = await _db.get_deposit_addr(t, config.COLDKEY_SECRET)
-                        # Add to db
-                        await _db.add_deposit_address(user.id, deposit_addr)
                     await channel.send(f"Please deposit to {deposit_addr}.\nThis address is linked to your discord account.\nOnly you will be able to withdraw from it.")
                 except DepositException as e:
                     await channel.send(f"Error: {e}")

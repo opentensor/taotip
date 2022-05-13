@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import pymongo
 import pymongo.results
@@ -119,6 +119,18 @@ class Database:
         except Exception as e:
             print(e)
             return None
+
+    async def get_all_addresses(self) -> List[Dict]:
+        assert self.db is not None
+
+        query: Dict = {}
+
+        try:
+            doc: Dict = self.db.addresses.find(query)
+            return doc
+        except Exception as e:
+            print(e)
+            return []
 
     def get_address_by_user(self, user: str) -> Optional['Address']:
         assert self.db is not None
