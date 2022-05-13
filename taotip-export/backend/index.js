@@ -1,19 +1,17 @@
 import 'dotenv/config';
 import passport from 'passport';
-import { Strategy as DiscordStrategy } from 'passport-discord';
 import express from 'express';
 import session from 'express-session';
 import MongoStore from 'connect-mongo';
 import mongoose from 'mongoose';
-import Address from './Address.js';
 import _ from 'lodash';
 import cors from 'cors';
 
 import router from './routes.js';
+import { authStrategy } from './auth.js';
 
 const app = express();
 
-const scopes = ['identify'];
 
 passport.serializeUser(function(user, done) {
     done(null, user);
@@ -22,27 +20,7 @@ passport.deserializeUser(function(obj, done) {
     done(null, obj);
 });
 
-passport.use(new DiscordStrategy({
-        clientID: process.env.DISCORD_CLIENT_ID,
-        clientSecret: process.env.DISCORD_SECRET,
-        callbackURL: process.env.DISCORD_CALLBACK_URL,
-        scope: scopes
-    },
-    function(accessToken, refreshToken, profile, cb) {
-        Address.findOne({
-            user: profile.id,
-        }, (err, address) => {
-            if (err || !address) {
-                cb(err);
-            }
-            const addr = _.omit(address, ['_id', '__v', 'mnemonic']);
-            if (process.env.TESTING) {
-                console.log(`User with id ${profile.id} logged in. Address: ${addr.address}`);
-            }
-            cb(err, addr);
-        });
-    }
-));
+passport.use(authStrategy);
 
 app.use(session({
     secret: process.env.SESSION_SECRET,
