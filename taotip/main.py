@@ -2,7 +2,7 @@ import asyncio
 import discord
 
 from src import api, event_handlers
-from src.config import main_config as config
+from src.config import main_config as config, Config
 from src.db import Database
 
 _db: Database = None
@@ -25,7 +25,7 @@ def main() -> None:
             await on_ready()
             return
         # add to client loop
-        client.loop.create_task(lambda _db, client: welcome_new_users(_db, client, config))
+        client.loop.create_task(welcome_new_users(_db, client, config))
 
     @client.event
     async def on_message(message: discord.Message):
@@ -33,10 +33,8 @@ def main() -> None:
         global _api
         await event_handlers.on_message_(_db, client, message, config)
 
-    async def welcome_new_users(_db: Database, client: discord.Client, config: config.Config):
-        print("Checking for new users...")
+    async def welcome_new_users(_db: Database, client: discord.Client, config: Config):
         await event_handlers.welcome_new_users(_db, client, config)
-
         # sleep until next check
         await asyncio.sleep(config.NEW_USER_CHECK_INTERVAL)
 
