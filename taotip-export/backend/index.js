@@ -41,6 +41,7 @@ if (process.env.NODE_ENV === 'development' || process.env.TESTING) {
         origin: function(origin, cb) {
             const whitelist = [
                 'http://localhost:5000',
+                'https://taotip.opentensor.ai'
             ]
 
             // check if the request is from a origin in whitelist
