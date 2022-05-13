@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.2.1-base-ubuntu18.04
+FROM nvidia/cuda:11.2.1-base-ubuntu20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -9,7 +9,7 @@ RUN apt-get update && \
     
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update && apt-get upgrade -y
-RUN apt-get install python3.7 python3.7-dev -y
+RUN apt-get install python3.7 python3.7-dev python3.7-distutils -y
 RUN python3.7 -m pip install --upgrade pip
 
 RUN apt-get install git -y
