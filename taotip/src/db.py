@@ -90,10 +90,7 @@ class Database:
         doc: Dict = {
             "address": new_address.address,
             "mnemonic": new_address.get_encrypted_mnemonic(),
-            "locked": False,
-            "unlock": None,
-            "user": None,
-            "balance": 0
+            "user": None
         }
 
         try:
