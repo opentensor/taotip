@@ -151,6 +151,6 @@ async def welcome_new_users( _db: Database, client: discord.Client, config: conf
     for user in tqdm(users, "Welcoming new users..."):
         discord_user = await client.fetch_user(int(user))
         await discord_user.send(f"""Welcome! You can deposit or withdraw tao using the following commands:\n{config.HELP_STR}
-        \nPlease backup your mnemonic on the following website: https://taotip.opentensor.ai/""")
+        \nPlease backup your mnemonic on the following website: {config.EXPORT_URL}""")
         await _db.set_welcomed_user(user, True)
 

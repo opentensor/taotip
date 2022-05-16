@@ -24,6 +24,7 @@ class Config:
         NUM_DEPOSIT_ADDRESSES: int
         HELP_STR: str
         NEW_USER_CHECK_INTERVAL: int
+        EXPORT_URL: str
         def __init__(self, *args):
             if len(args) == 1:
                     if isinstance(args[0], SimpleNamespace):
@@ -49,18 +50,18 @@ main_config_ = SimpleNamespace(
         DEP_PROMPT=f"!deposit",
         WIT_PROMPT=f"!withdraw (5([A-z]|[0-9])+)\s+([1-9][0-9]*|0)(\.|\.[0-9]+)?\s*(<currency>|)?",
         HELP_PROMPT="!help|!h",
-        MAINTAINER="@#", # discord handle
+        MAINTAINER="<@!>", # discord handle
         DEP_ACTIVE_TIME=600.0, # seconds
         DEPOSIT_INTERVAL=24.0, # seconds
         CHECK_ALL_INTERVAL=300.0, # seconds
         SUBTENSOR_ENDPOINT="<subtensor-ip>:9944",
         TESTING=True,
-        NUM_DEPOSIT_ADDRESSES=10,
         HELP_STR="To get your balance, type: `!balance` or `!bal`\n" + \
                 "To deposit tao, type: `!deposit`\n" + \
                 "To withdraw your tao, type: `!withdraw <address> <amount>`\n" + \
-                f"For help, type: `!h` or `!help` or contact <maintainer>n",
-        NEW_USER_CHECK_INTERVAL=10.0 # seconds
+                f"For help, type: `!h` or `!help` or contact <maintainer>",
+        NEW_USER_CHECK_INTERVAL=60.0, # seconds
+        EXPORT_URL="https://taotip.opentensor.ai/",
 )
 main_config_.WIT_PROMPT = main_config_.WIT_PROMPT.replace('<currency>', main_config_.CURRENCY)
 main_config_.HELP_STR = main_config_.HELP_STR.replace('<maintainer>', main_config_.MAINTAINER)
