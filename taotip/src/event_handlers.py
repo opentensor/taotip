@@ -1,5 +1,5 @@
 from string import Template
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import discord
 import pymongo
@@ -62,20 +62,21 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
     parser: parse.Parser = parse.Parser(config)
 
     channel: discord.channel.TextChannel = message.channel
-    if message.author == client.user:
+    if message.author.id == client.user.id:
         return
 
     if message.content.startswith(config.PROMPT):
-        if (len(message.mentions) == 1 and message.mentions[0] != message.author):
+        sender: discord.Member = message.author
+        if (len(message.mentions) == 1 and message.mentions[0].id != sender.id):
             if ((message.mentions[0].bot or message.mentions[0].id == config.BOT_ID) and not config.TESTING):
-                await channel.send(f"{message.author.mention} You can't tip bots!")
+                await sender.send(f"{message.author.mention} You can't tip bots!")
                 return
             if(validator.is_valid_format(message.content)):
-                sender = message.author
                 amount: Balance = Balance.from_tao(parser.get_amount(message.content))
                 recipient = message.mentions[0]
-                if ((await client.fetch_user(recipient.id)) is None):
-                    await channel.send(f"{message.author.mention} {recipient.mention} is not a valid user!")
+                recipient_user: Optional[discord.User] = await client.fetch_user(recipient.id)
+                if (recipient_user is None):
+                    await sender.send(f"{message.author.mention} {recipient.mention} is not a valid user!")
                     return
                 t = Tip(sender.id, recipient.id, amount)
                 result = await t.send(_db, config.COLDKEY_SECRET)
@@ -84,7 +85,7 @@ async def on_message_(_db: Database, client: discord.Client, message: discord.Me
                     await channel.send(f"{sender.mention} tipped {recipient.mention} {amount.tao} tao")
                 else:
                     print(f"{sender} tried to tip {recipient} {amount.tao} tao but failed")
-                    await channel.send(f"{sender.mention} tried to tip {recipient.mention} {amount.tao} tao but failed")
+                    await sender.send(f"You tried to tip {recipient.mention} {amount.tao} tao but it failed")
 
     elif isinstance(channel, discord.channel.DMChannel):
         # might be deposit, withdraw, help, or balance check
