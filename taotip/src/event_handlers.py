@@ -151,7 +151,12 @@ async def welcome_new_users( _db: Database, client: discord.Client, config: conf
     users: List[str] = await _db.get_unwelcomed_users()
     for user in tqdm(users, "Welcoming new users..."):
         discord_user = await client.fetch_user(int(user))
-        await discord_user.send(f"""Welcome! You can deposit or withdraw tao using the following commands:\n{config.HELP_STR}
-        \nPlease backup your mnemonic on the following website: {config.EXPORT_URL}""")
-        await _db.set_welcomed_user(user, True)
+        try:
+            await discord_user.send(f"""Welcome! You can deposit or withdraw tao using the following commands:\n{config.HELP_STR}
+            \nPlease backup your mnemonic on the following website: {config.EXPORT_URL}""")
+            await _db.set_welcomed_user(user, True)
+        except Exception as e:
+            print(e)
+            print("Can't send welcome message to user...")
+        
 
