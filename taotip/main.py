@@ -98,6 +98,9 @@ def main() -> None:
             try:
                 guild: interactions.Guild = await ctx.get_guild()
                 recipient: interactions.Member = await guild.get_member(int(recipient))
+                if recipient.user.bot:
+                    await ctx.send(f"{recipient.user.name} is a bot. You cannot tip them", ephemeral=True)
+                    return interactions.StopCommand()
             except ValueError:
                 await ctx.send("Invalid recipient", ephemeral=True)
                 return interactions.StopCommand()
