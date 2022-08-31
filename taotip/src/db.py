@@ -20,6 +20,7 @@ class Database:
 
     async def check_balance(self, user_id: str) -> Balance:
         assert self.db is not None
+        assert self.api is not None
         # Get the address for the user
         addr: Address = self.get_address_by_user(user_id)
         if addr is None:
