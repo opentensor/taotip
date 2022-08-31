@@ -27,8 +27,7 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-        mongoUrl: process.env.TESTING ? process.env.MONGODB_URI_TEST : process.env.MONGODB_URI,
-        dbName: process.env.TESTING ? 'test': 'prod',
+        mongoUrl: process.env.TESTING === "true" ? process.env.MONGODB_URI_TEST : process.env.MONGODB_URI,
     })
 }));
 
