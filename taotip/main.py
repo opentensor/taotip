@@ -86,13 +86,15 @@ def main() -> None:
             """
             Handle the tip user modal response
             """
-            if not amount.isnumeric():
-                await ctx.send("Invalid amount")
-                return
-            amount = float(amount)
+            try:
+                amount = float(amount)
+            except ValueError:
+                await ctx.send(f"Invalid amount: {amount} . Should be numeric", ephemeral=True)
+                return interactions.StopCommand()
+                
             if amount <= 0.0:
-                await ctx.send("Invalid amount")
-                return
+                await ctx.send(f"Invalid amount: {amount} . Must be >= 0.0 tao", ephemeral=True)
+                return interactions.StopCommand()
             try:
                 guild: interactions.Guild = await ctx.get_guild()
                 recipient: interactions.Member = await guild.get_member(int(recipient))
