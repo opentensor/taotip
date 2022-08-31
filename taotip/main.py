@@ -177,12 +177,13 @@ def main() -> None:
             # get the float amount from the string
             amount_str = ctx.message.content.split("Are you sure you want to tip ")[1].split(" to ")[0][1:]
             amount = Balance.from_tao(float(amount_str))
-            await ctx.defer(ephemeral=True)
+            await ctx.defer(ephemeral=True, edit_origin=True)
             await event_handlers.tip_user(config, _db, ctx, sender, recipient, amount)
             await ctx.send("Tip sent!", ephemeral=True)
 
         @bot.component("cancel_tip")
         async def cancel_response(ctx: interactions.ComponentContext):
+            await ctx.defer(ephemeral=True, edit_origin=True)
             await ctx.send("Tip cancelled!", ephemeral=True)
 
         @bot.command(
