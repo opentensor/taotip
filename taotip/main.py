@@ -104,8 +104,11 @@ def main() -> None:
             except ValueError:
                 await ctx.send("Invalid recipient", ephemeral=True)
                 return interactions.StopCommand()
-            
+
+            await ctx.defer(ephemeral=True)
             await event_handlers.tip_user(config, _db, ctx, ctx.user, recipient.user, Balance.from_tao(amount))
+            
+
 
         @bot.command(
             name="tip",
