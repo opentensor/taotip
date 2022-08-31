@@ -167,7 +167,7 @@ def main() -> None:
             row = interactions.ActionRow.new(send_tip_button, cancel_button)
 
             # ask for confirmation to send tip
-            await ctx.user.send("Are you sure you want to tip {} to {}?".format(amount, recipient.mention), components=row)
+            await ctx.member.send("Are you sure you want to tip {} to {}?".format(amount, recipient.mention), components=row)
 
         @bot.component("send_tip")
         async def button_response(ctx: interactions.ComponentContext):
