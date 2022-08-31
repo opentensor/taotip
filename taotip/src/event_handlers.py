@@ -243,7 +243,7 @@ def init_commands(bot: interactions.Client, config: 'config.Config', _db: Databa
         description="Show help",
     )
     async def help(ctx: interactions.CommandContext):
-        await ctx.author.send(config.HELP_STR)
+        await ctx.author.send(config.HELP_STR, ephemeral=True)
 
     @bot.command(
         name="balance",
