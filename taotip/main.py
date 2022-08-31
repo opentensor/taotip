@@ -111,8 +111,7 @@ def main() -> None:
 
             await ctx.defer(ephemeral=True)
             await event_handlers.tip_user(config, _db, ctx, ctx.user, recipient.user, Balance.from_tao(amount))
-            
-
+            await ctx.send(None)
 
         @bot.command(
             name="tip",
