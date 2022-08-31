@@ -1,6 +1,6 @@
 db.createUser({
     user: "taotip",
-    pwd: "<password of user>",
+    pwd: "test_pass",
     roles: [{
         role: "readWrite",
         db: "test"
@@ -9,7 +9,7 @@ db.createUser({
 
 db.createUser({
     user: "taotip",
-    pwd: "<password of user>",
+    pwd: "prod_pass",
     roles: [{
         role: "readWrite",
         db: "prod"
