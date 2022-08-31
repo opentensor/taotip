@@ -78,6 +78,7 @@ async def tip_user( config: config.Config, _db: Database, ctx: interactions.cont
         result = await t.send(_db, config.COLDKEY_SECRET)
     except FeeException as e:
         await ctx.channel.send(f"You do not have enough balance to tip {amount.tao} tao with fee {e.fee.tao}", ephemeral=is_not_DM)
+        await ctx.send("Tip Canceled")
         await ctx.message.delete()
         return
 
@@ -87,6 +88,7 @@ async def tip_user( config: config.Config, _db: Database, ctx: interactions.cont
     else:
         print(f"{sender} tried to tip {recipient} {amount.tao} tao but failed")
         await ctx.channel.send(f"You tried to tip {recipient.mention} {amount.tao} tao but it failed", ephemeral=is_not_DM)
+        await ctx.send("Tip Canceled")
         await ctx.message.delete()
 
 
