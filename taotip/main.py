@@ -166,7 +166,7 @@ def main() -> None:
         @bot.component("send_tip")
         async def button_response(ctx: interactions.ComponentContext):
             sender = ctx.user
-            recipient_id = ctx.message.content[29:].split(" to ")[1].replace('?', '')
+            recipient_id = ctx.message.content[29:].split(" to ")[1].replace('?', '').replace('<@', '').replace('>', '')
             recipient = await interactions.get(bot, interactions.User, object_id=recipient_id)
             # get the float amount from the string
             amount_str = ctx.message.content.split("Are you sure you want to tip ")[1].split(" to ")[0][1:]
