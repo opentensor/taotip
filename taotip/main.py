@@ -11,7 +11,7 @@ def main() -> None:
 
     bot = interactions.Client(token=config.DISCORD_TOKEN)
 
-    @bot.event(interactions.EventType.READY)
+    @bot.event
     async def on_ready():
         _db: Database = None
         _api: api.API = None
