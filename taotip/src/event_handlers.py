@@ -8,7 +8,7 @@ from websocket import WebSocketException
 import interactions
 
 from . import api, config
-from .db import Database, DepositException, Tip, Transaction, WithdrawException
+from .db import Database, DepositException, FeeException, Tip, Transaction, WithdrawException
 
 
 class DeltaTemplate(Template):
@@ -74,7 +74,12 @@ async def tip_user( config: config.Config, _db: Database, ctx: interactions.cont
     is_not_DM: bool = not await is_in_DM(ctx)
 
     t = Tip(sender.id, recipient.id, amount)
-    result = await t.send(_db, config.COLDKEY_SECRET)
+    try:
+        result = await t.send(_db, config.COLDKEY_SECRET)
+    except FeeException as e:
+        await ctx.send(f"You do not have enough balance to tip {amount.tao} tao with fee {e.fee.tao}", ephemeral=is_not_DM)
+        return
+
     if (result):
         print(f"{sender} tipped {recipient} {amount.tao} tao")
         await ctx.send(f"{sender.mention} tipped {recipient.mention} {amount.tao} tao")

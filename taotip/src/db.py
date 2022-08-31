@@ -7,6 +7,14 @@ from bittensor import Balance
 from cryptography.fernet import Fernet
 
 
+class FeeException(Exception):
+    """Raise when sender has insufficient funds to cover fee"""
+
+    def __init__(self, message: str, fee: Balance):
+        super().__init__(message)
+        self.fee = fee
+
+
 class Database:
     client: pymongo.MongoClient
     db = None
@@ -167,7 +175,7 @@ class Database:
         ## Get transfer fee
         transfer_fee: Balance = await self.api.get_fee(sender_addr.address, recipient_addr.address, amount)
         if sender_balance < amount + transfer_fee:
-            raise Exception("Sender does not have enough balance")
+            raise FeeException("Sender does not have enough balance", transfer_fee)
         
         # transfer
         try:
