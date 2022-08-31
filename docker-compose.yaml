@@ -1,7 +1,7 @@
 version: '3.9'
 services:
   mongodb:
-    container_name: container-mongodb
+    container_name: taotip-mongodb
     image: mongo:5.0.8
     restart: always
     environment:
@@ -10,6 +10,8 @@ services:
 
     ports:
       - 27017:27017
+    networks:
+      - backend
     volumes:
       - mongodb_data_container:/data/db
       - ./mongodb/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
@@ -22,16 +24,24 @@ services:
       - taotip_data_container:/data/taotip
     depends_on:
       - mongodb
+    networks:
+      - backend
   export-service:
     container_name: export-service
     build:
       context: ./taotip-export/
       dockerfile: Dockerfile
     ports:
-      - 5000:5000
+      - 80:5000
     depends_on:
       - mongodb
+    networks:
+      - backend
     
 volumes:
   mongodb_data_container:
   taotip_data_container:
+
+networks:
+  backend:
+    driver: bridge
