@@ -110,7 +110,7 @@ def main() -> None:
                 return interactions.StopCommand()
 
             await event_handlers.tip_user(config, _db, ctx, ctx.user, recipient.user, Balance.from_tao(amount))
-            await ctx.send(None)
+            await ctx.send("Tip sent", ephemeral=True)
 
         @bot.command(
             name="tip",
