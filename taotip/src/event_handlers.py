@@ -27,7 +27,7 @@ async def is_in_DM(ctx: interactions.CommandContext) -> bool:
 
 async def on_ready_(client: interactions.Client, config: config.Config) -> Tuple[api.API, Database]:
     try:
-        _api = api.API(testing=config.TESTING)
+        _api = api.API(config, testing=config.TESTING)
     except WebSocketException as e:
         print(e)
         print("Failed to connect to Substrate node...")

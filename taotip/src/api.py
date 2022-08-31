@@ -6,7 +6,7 @@ from scalecodec.types import GenericCall
 from substrateinterface import Keypair
 from tqdm import tqdm
 
-from . import config
+from .config import Config
 from .db import Address, Database, Transaction
 
 
@@ -14,7 +14,7 @@ class API:
     subtensor: bittensor.Subtensor = None
     network: str
 
-    def __init__(self, testing: bool=True) -> None:
+    def __init__(self, config: Config, testing: bool=True) -> None:
         # Uses testnet if testing is true
         if testing:
             self.network = 'Nobunaga'

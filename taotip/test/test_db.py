@@ -10,7 +10,7 @@ from taotip.src.db import Address, Tip
 class DBTestCase(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-        cls._api: api.API = api.API(testing=True)
+        cls._api: api.API = api.API(None, testing=True)
         cls._db: db.Database = db.Database(mongomock.MongoClient(), cls._api, True)
 
     def tearDown(self) -> None:
