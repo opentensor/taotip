@@ -166,7 +166,8 @@ def main() -> None:
         @bot.component("send_tip")
         async def button_response(ctx: interactions.ComponentContext):
             sender = ctx.user
-            recipient = ctx.message.mentions[0].user
+            recipient = ctx.message.mentions[0]
+            print(f"{sender} is tipping {recipient}")
             amount_str = ctx.message.content.split("Are you sure you want to tip ")[1].split(" tao to ")[0]
             amount = Balance.from_tao(float(amount_str))
             await event_handlers.tip_user(config, _db, ctx, sender, recipient, amount)
