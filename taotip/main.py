@@ -5,7 +5,7 @@ from src import api, event_handlers
 from src.config import main_config as config, Config
 from src.db import Database
 
-async def main() -> None:
+def main() -> None:
     print("Running Tao Tip...")
 
 
@@ -37,4 +37,4 @@ async def main() -> None:
     bot.start()
     
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
