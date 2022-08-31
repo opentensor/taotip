@@ -1,1 +1,1 @@
-cd ./taotip-export/client && yarn build
+cd ./taotip-export/client && yarn && yarn build
