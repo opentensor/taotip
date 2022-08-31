@@ -75,6 +75,12 @@ app.get('*', (req, res) => {
         '/', '/export'
     ]
     if (pages.indexOf(req.path) === 1) {
+        if (req.path === '/export') {
+            // redirect to / if user is not authenticated
+            if (!req.isAuthenticated()) {
+                return res.redirect('/')
+            }
+        }
         return res.sendFile(`/app/build/index.html`);
     }
 });
