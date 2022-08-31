@@ -9,13 +9,13 @@ RUN apt-get update && \
     
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update && apt-get upgrade -y
-RUN apt-get install python3.7 python3.7-dev python3.7-distutils -y
-RUN python3.7 -m pip install --upgrade pip
+RUN apt-get install python3.9 python3.9-dev python3.9-distutils -y
+RUN python3.9 -m pip install --upgrade pip
 
 RUN apt-get install git -y
 
 RUN rm /usr/bin/python3
-RUN ln -s //usr/bin/python3.7 /usr/bin/python3
+RUN ln -s //usr/bin/python3.9 /usr/bin/python3
 
 WORKDIR /usr/app/
 
