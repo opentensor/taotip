@@ -29,7 +29,7 @@ def make_modal(user_id: str, amount: float = 0.0) -> str:
             interactions.TextInput(
                 label="Amount",
                 custom_id="amount",
-                placeholder=f"{str(amount):0.8f} TAO",
+                placeholder=f"{amount:0.8f} TAO",
                 required=True,
                 value=str(amount),
                 style=interactions.TextStyleType.SHORT,
