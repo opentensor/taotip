@@ -13,6 +13,31 @@ from src.db import Database
 _db: Database = None
 _api: api.API = None
 
+def make_modal(user_id: str, amount: float = 0.0) -> str:
+    tip_modal = interactions.Modal(
+        title="Tip User",
+        custom_id="tip_user_form",
+        components=[
+            interactions.TextInput(
+                label="Recipient",
+                custom_id="recipient",
+                required=True,
+                value=str(user_id),
+                style=interactions.TextStyleType.SHORT,
+                disabled=True,
+            ),
+            interactions.TextInput(
+                label="Amount",
+                custom_id="amount",
+                placeholder=f"{str(amount):0.8f} TAO",
+                required=True,
+                value=str(amount),
+                style=interactions.TextStyleType.SHORT,
+            ),
+        ],
+    )
+    return tip_modal
+
 def main() -> None:
     print("Running Tao Tip...")
 
@@ -56,28 +81,7 @@ def main() -> None:
             """
             Tip a user
             """
-            modal = interactions.Modal(
-                title="tip user",
-                custom_id="tip_user_form",
-                components=[
-                    interactions.TextInput(
-                        label="Recipient",
-                        custom_id="recipient",
-                        required=True,
-                        value=str(ctx.target.user.id),
-                        style=interactions.TextStyleType.SHORT,
-                        disabled=True,
-                    ),
-                    interactions.TextInput(
-                        label="Amount",
-                        custom_id="amount",
-                        placeholder="0 TAO",
-                        required=True,
-                        value="0",
-                        style=interactions.TextStyleType.SHORT,
-                    ),
-                ],
-            )
+            modal: interactions.Modal = make_modal(ctx.target.user.id)
 
             await ctx.popup(modal)
 
@@ -151,40 +155,9 @@ def main() -> None:
             if not (await event_handlers.check_enough_tao(config, _db, ctx, sender, amount)):
                 return interactions.StopCommand()
 
-            # ask for confirmation
-            send_tip_button = interactions.Button(
-                style=interactions.ButtonStyle.SUCCESS,
-                label="Send",
-                custom_id="send_tip",
-            )
-
-            cancel_button = interactions.Button(
-                style=interactions.ButtonStyle.DANGER,
-                label="Cancel",
-                custom_id="cancel_tip",
-            )
-
-            row = interactions.ActionRow.new(send_tip_button, cancel_button)
-
-            # ask for confirmation to send tip
-            await ctx.member.send("Are you sure you want to tip {} to {}?".format(amount, recipient.mention), components=row)
-
-        @bot.component("send_tip")
-        async def button_response(ctx: interactions.ComponentContext):
-            sender = ctx.user
-            recipient_id = ctx.message.content[29:].split(" to ")[1].replace('?', '').replace('<@', '').replace('>', '')
-            recipient = await interactions.get(bot, interactions.User, object_id=recipient_id)
-            # get the float amount from the string
-            amount_str = ctx.message.content.split("Are you sure you want to tip ")[1].split(" to ")[0][1:]
-            amount = Balance.from_tao(float(amount_str))
-            await ctx.defer(ephemeral=True, edit_origin=True)
-            await event_handlers.tip_user(config, _db, ctx, sender, recipient, amount)
-            await ctx.message.delete()
-
-        @bot.component("cancel_tip")
-        async def cancel_response(ctx: interactions.ComponentContext):
-            await ctx.send("Tip cancelled!", ephemeral=True)
-            await ctx.message.delete()
+            # create modal
+            modal = make_modal(recipient.id, amount.tao)
+            await ctx.popup(modal)
 
         @bot.command(
             name="balance",
