@@ -7,8 +7,8 @@ from callee import Contains
 import bittensor
 from cryptography.fernet import Fernet
 
-from ..src import api, db
-from .test_db import DBTestCase
+from taotip.src import api, db
+from taotip.test.test_db import DBTestCase
 
 """
 Testing all the chain functions in the api.py file.

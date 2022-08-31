@@ -3,11 +3,9 @@ from unittest.mock import MagicMock
 import bittensor
 import mongomock
 import unittest
-import asyncio
 from cryptography.fernet import Fernet
-from more_itertools import side_effect
-from ..src import api, db, parse
-from ..src.db import Address, Tip
+from taotip.src import api, db
+from taotip.src.db import Address, Tip
 
 class DBTestCase(unittest.IsolatedAsyncioTestCase):
     @classmethod
@@ -112,7 +110,7 @@ class TestAddressCreate(DBTestCase):
         key_bytes: bytes = Fernet.generate_key()
         addr: str = await self._db.create_new_address(key=key_bytes)
         self.assertIsNotNone(addr)
-        self.assertTrue(parse.is_valid_ss58_address(addr, 42)) #bittensor ss58 format
+        self.assertTrue(bittensor.utils.is_valid_ss58_address(addr, 42)) #bittensor ss58 format
 
         # Check if address is in db
         enc_address: Address = self._db.db.addresses.find_one({'address': addr})
