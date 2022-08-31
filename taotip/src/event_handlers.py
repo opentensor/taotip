@@ -152,9 +152,10 @@ async def welcome_new_users( _db: Database, client: interactions.Client, config:
 
     users: List[str] = await _db.get_unwelcomed_users()
     for user in tqdm(users, "Welcoming new users..."):
-        discord_user: interactions.User = await interactions.get(client, interactions.User, object_id=user)
+        discord_user: interactions.Member = await interactions.get(client, interactions.Member, object_id=user, parent_id=config.BITTENSOR_DISCORD_SERVER)
+
         if (discord_user is None):
-            print(f"{user} is not a valid discord user")
+            print(f"{user} is not a valid discord user in the guild")
             continue
         try:
             await discord_user.send(f"""Welcome! You can deposit or withdraw tao using the following commands:\n{config.HELP_STR}
