@@ -36,7 +36,7 @@ app.use(passport.session());
 
 app.use(express.json())
 
-if (process.env.NODE_ENV === 'development' || process.env.TESTING) {
+if (process.env.NODE_ENV === 'development' || process.env.TESTING === 'true') {
     const corsOptions = {
         origin: function(origin, cb) {
             const whitelist = [
@@ -87,7 +87,7 @@ app.all('*', (req, res) => {
 });
 
 try {
-    const mongo_uri = process.env.TESTING ? process.env.MONGODB_URI_TEST : process.env.MONGODB_URI;
+    const mongo_uri = process.env.TESTING === 'true' ? process.env.MONGODB_URI_TEST : process.env.MONGODB_URI;
     await mongoose.connect(mongo_uri);
     // start express server on port 5000
     app.listen(5000, () => {

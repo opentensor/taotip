@@ -24,9 +24,7 @@ function(accessToken, refreshToken, profile, cb) {
         if (err) {
             return cb(err);
         } else {
-            if (process.env.TESTING) {
-                console.log(`User with id ${profile.id} logged in. Address: ${address?.address}`);
-            }
+            console.log(`User with id ${profile.id} logged in. Address: ${address?.address}`);
             const user = {
                 user: String(profile.id),
                 address: address?.address,
