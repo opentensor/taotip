@@ -17,13 +17,17 @@ RUN apt-get install git -y
 RUN rm /usr/bin/python3
 RUN ln -s //usr/bin/python3.9 /usr/bin/python3
 
+RUN pip install --upgrade wheel
+RUN pip install setuptools
+
+# Install bittensor
+RUN pip install git+https://github.com/opentensor/bittensor.git#bittensor@master
+
 WORKDIR /usr/app/
 
 ADD . /usr/app/
 
-RUN pip install --upgrade wheel
-RUN pip install setuptools
-
+# Install requirements.txt
 RUN pip install -r requirements.txt --no-cache-dir
 
 ENTRYPOINT [ "/usr/bin/python3" ]
