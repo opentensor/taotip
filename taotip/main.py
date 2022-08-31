@@ -166,8 +166,8 @@ def main() -> None:
         @bot.component("send_tip")
         async def button_response(ctx: interactions.ComponentContext):
             sender = ctx.user
-            recipient = ctx.message.mentions[0]
-            print(f"{sender} is tipping {recipient}")
+            recipient_id = ctx.message.content[29:].split(" to ")[1].replace('?', '')
+            recipient = await interactions.get(bot, interactions.User, recipient_id)
             # get the float amount from the string
             amount_str = ctx.message.content.split("Are you sure you want to tip ")[1].split(" to ")[0][1:]
             amount = Balance.from_tao(float(amount_str))
