@@ -16,7 +16,7 @@ router.post("/export", checkAuth, async(req, res) => {
     // req.user contains the address from db
     try {
         const address = await Address.findOne({
-            user: str(req.user.user),
+            user: String(req.user.user),
         });
 
         if (!address) {

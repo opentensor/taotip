@@ -19,7 +19,7 @@ export const authStrategy = new DiscordStrategy({
 },
 function(accessToken, refreshToken, profile, cb) {
     Address.findOne({
-        user: str(profile.id),
+        user: String(profile.id),
     }, (err, address) => {
         if (err) {
             return cb(err);
@@ -28,7 +28,7 @@ function(accessToken, refreshToken, profile, cb) {
                 console.log(`User with id ${profile.id} logged in. Address: ${address?.address}`);
             }
             const user = {
-                user: str(profile.id),
+                user: String(profile.id),
                 address: address?.address,
             }
             return cb(err, user);
