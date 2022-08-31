@@ -167,7 +167,7 @@ def main() -> None:
             row = interactions.ActionRow.new(send_tip_button, cancel_button)
 
             # ask for confirmation to send tip
-            await ctx.send("Are you sure you want to tip {} to {}?".format(amount, recipient.mention), components=row, ephemeral=True)
+            await ctx.user.send("Are you sure you want to tip {} to {}?".format(amount, recipient.mention), components=row)
 
         @bot.component("send_tip")
         async def button_response(ctx: interactions.ComponentContext):
@@ -179,11 +179,12 @@ def main() -> None:
             amount = Balance.from_tao(float(amount_str))
             await ctx.defer(ephemeral=True, edit_origin=True)
             await event_handlers.tip_user(config, _db, ctx, sender, recipient, amount)
-            await ctx.edit("Tip sent!", ephemeral=True)
+            await ctx.message.delete()
 
         @bot.component("cancel_tip")
         async def cancel_response(ctx: interactions.ComponentContext):
-            await ctx.edit("Tip cancelled!", ephemeral=True)
+            await ctx.send("Tip cancelled!", ephemeral=True)
+            await ctx.message.delete()
 
         @bot.command(
             name="balance",
