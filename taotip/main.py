@@ -161,14 +161,15 @@ def main() -> None:
             row = interactions.ActionRow.new(send_tip_button, cancel_button)
 
             # ask for confirmation to send tip
-            await ctx.send("Are you sure you want to tip {} tao to {}?".format(amount, recipient.mention), components=row, ephemeral=True)
+            await ctx.send("Are you sure you want to tip {} to {}?".format(amount, recipient.mention), components=row, ephemeral=True)
 
         @bot.component("send_tip")
         async def button_response(ctx: interactions.ComponentContext):
             sender = ctx.user
             recipient = ctx.message.mentions[0]
             print(f"{sender} is tipping {recipient}")
-            amount_str = ctx.message.content.split("Are you sure you want to tip ")[1].split(" tao to ")[0].replace("𝜏", "")
+            # get the float amount from the string
+            amount_str = ctx.message.content.split("Are you sure you want to tip ")[1].split(" to ")[0][1:]
             amount = Balance.from_tao(float(amount_str))
             await event_handlers.tip_user(config, _db, ctx, sender, recipient, amount)
             return interactions
