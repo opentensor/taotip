@@ -91,7 +91,7 @@ def main() -> None:
             except ValueError:
                 await ctx.send(f"Invalid amount: {amount} . Should be numeric", ephemeral=True)
                 return interactions.StopCommand()
-                
+
             if amount <= 0.0:
                 await ctx.send(f"Invalid amount: {amount} . Must be >= 0.0 tao", ephemeral=True)
                 return interactions.StopCommand()
@@ -160,19 +160,21 @@ def main() -> None:
 
             row = interactions.ActionRow.new(send_tip_button, cancel_button)
 
-            @bot.component("send_tip")
-            async def button_response(ctx: interactions.ComponentContext):
-                nonlocal amount
-                nonlocal recipient
-                nonlocal sender
-                await event_handlers.tip_user(config, _db, ctx, sender, recipient, amount)
-
-            @bot.component("cancel_tip")
-            async def cancel_response(ctx: interactions.ComponentContext):
-                await ctx.send("Tip cancelled", ephemeral=True)
-
             # ask for confirmation to send tip
             await ctx.send("Are you sure you want to tip {} tao to {}?".format(amount, recipient.mention), components=row, ephemeral=True)
+
+        @bot.component("send_tip")
+        async def button_response(ctx: interactions.ComponentContext):
+            sender = ctx.user
+            recipient = ctx.message.mentions[0].user
+            amount_str = ctx.message.content.split("Are you sure you want to tip ")[1].split(" tao to ")[0]
+            amount = Balance.from_tao(float(amount_str))
+            await event_handlers.tip_user(config, _db, ctx, sender, recipient, amount)
+            return interactions
+
+        @bot.component("cancel_tip")
+        async def cancel_response(ctx: interactions.ComponentContext):
+            await ctx.send("Tip cancelled", ephemeral=True)
 
         @bot.command(
             name="balance",
