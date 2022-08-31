@@ -93,9 +93,12 @@ def main() -> None:
             if amount <= 0.0:
                 await ctx.send("Invalid amount")
                 return
-            
-            guild: interactions.Guild = await ctx.get_guild()
-            recipient: interactions.Member = await guild.get_member(int(recipient))
+            try:
+                guild: interactions.Guild = await ctx.get_guild()
+                recipient: interactions.Member = await guild.get_member(int(recipient))
+            except ValueError:
+                await ctx.send("Invalid recipient", ephemeral=True)
+                return interactions.StopCommand()
             
             await event_handlers.tip_user(config, _db, ctx, ctx.user, recipient.user, Balance.from_tao(amount))
 
@@ -124,17 +127,17 @@ def main() -> None:
             recipient: interactions.User = recipient.user
             if (recipient == sender):
                 await ctx.send("You can't tip yourself!", ephemeral=True)
-                return
+                return interactions.StopCommand()
 
             if (recipient.bot  and not config.TESTING):
                 await ctx.send(f"You can't tip bots!", ephemeral=True)
-                return
+                return interactions.StopCommand()
 
             amount: Balance = Balance.from_tao(amount)
 
             if (amount <= 0.0):
                 await ctx.send("Invalid amount", ephemeral=True)
-                return
+                return interactions.StopCommand()
 
             # check if sender has enough TAO
             if not (await event_handlers.check_enough_tao(config, _db, ctx, sender, amount)):
