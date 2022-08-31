@@ -158,6 +158,7 @@ def main() -> None:
             # create modal
             modal = make_modal(recipient.id, amount.tao)
             await ctx.popup(modal)
+            await ctx.send("Done.", ephemeral=True)
 
         @bot.command(
             name="balance",
