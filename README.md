@@ -14,12 +14,12 @@ Clone the repo
 Enter the directory  
 `cd taotip/`  
 Now fill in the config.py with your info.  
-Build the docker image  
-`docker build -t taotip .`  
-Run the docker image  
-`docker run taotip`
+Build the services  
+`./build.sh && ./build_export-service.sh`
+Docker compose up  
+`docker-compose up -d`
 
 ## Generating a secret for DB encryption
 Before using the tip bot, you must generate a secret for encrypting the wallet mnemonics on the database.
-You can generate a key using the provided script, or randomly, when no passphrase is passed.   
-`python3 utils/generate_secret.py --passphrase "optional passphrase"`  
+You can generate a key using the below:  
+`python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key())"`  

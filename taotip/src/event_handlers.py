@@ -1,18 +1,19 @@
 from string import Template
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Union
 
-import discord
 import pymongo
 from bittensor import Balance
 from tqdm import tqdm
 from websocket import WebSocketException
+import interactions
 
-from . import api, parse, validate, config
+from . import api, config
 from .db import Database, DepositException, Tip, Transaction, WithdrawException
 
 
 class DeltaTemplate(Template):
     delimiter = "%"
+
 
 def strfdelta(tdelta, fmt):
     d = {"D": tdelta.days}
@@ -21,7 +22,10 @@ def strfdelta(tdelta, fmt):
     t = DeltaTemplate(fmt)
     return t.substitute(**d)
 
-async def on_ready_(client: discord.Client, config: config.Config) -> Tuple[api.API, Database]:
+async def is_in_DM(ctx: interactions.CommandContext) -> bool:
+    return (await ctx.get_channel()).type == interactions.ChannelType.DM
+
+async def on_ready_(client: interactions.Client, config: config.Config) -> Tuple[api.API, Database]:
     try:
         _api = api.API(testing=config.TESTING)
     except WebSocketException as e:
@@ -29,7 +33,7 @@ async def on_ready_(client: discord.Client, config: config.Config) -> Tuple[api.
         print("Failed to connect to Substrate node...")
         _api = None
 
-    print('We have logged in as {0.user}'.format(client))
+    print('We have logged in as {}'.format(client.me.name))
     if (_api is None or not (await _api.test_connection())):
         print("Error: Can't connect to subtensor node...")
         _api = None
@@ -55,102 +59,98 @@ async def on_ready_(client: discord.Client, config: config.Config) -> Tuple[api.
         
     return _api, _db  
 
-async def on_message_(_db: Database, client: discord.Client, message: discord.Message, config: config.Config):
-    assert _db is not None
 
-    validator = validate.Validator(config)
-    parser: parse.Parser = parse.Parser(config)
+async def check_enough_tao( config: config.Config, _db: Database, ctx: interactions.context._Context, sender: interactions.User, amount: Balance) -> bool:
+    balance: Balance = await _db.check_balance(sender.id)
+    is_not_DM: bool = not await is_in_DM(ctx)
 
-    channel: discord.channel.TextChannel = message.channel
-    if message.author.id == client.user.id:
+    if (balance < amount):
+        await ctx.send(f"You don't have enough tao to tip {amount.tao} tao", ephemeral=is_not_DM)
+        return False
+    return True
+
+
+async def tip_user( config: config.Config, _db: Database, ctx: interactions.context._Context, sender: interactions.User, recipient: interactions.User, amount: Balance) -> None:
+    is_not_DM: bool = not await is_in_DM(ctx)
+
+    t = Tip(sender.id, recipient.id, amount)
+    result = await t.send(_db, config.COLDKEY_SECRET)
+    if (result):
+        print(f"{sender} tipped {recipient} {amount.tao} tao")
+        await ctx.send(f"{sender.mention} tipped {recipient.mention} {amount.tao} tao")
+    else:
+        print(f"{sender} tried to tip {recipient} {amount.tao} tao but failed")
+        await ctx.send(f"You tried to tip {recipient.mention} {amount.tao} tao but it failed", ephemeral=is_not_DM)
+
+
+async def do_withdraw( config: config.Config, _db: Database, ctx: interactions.CommandContext, user: interactions.User, ss58_address: str, amount: Balance):
+    is_not_DM: bool = not await is_in_DM(ctx)
+
+    t = Transaction(user.id, amount)
+    new_balance: int = None
+
+    # must be withdraw
+    try:
+        new_balance = await t.withdraw(_db, ss58_address, config.COLDKEY_SECRET)
+        await ctx.send(f"Withdrawal successful.\nYour new balance is: {new_balance} tao", ephemeral=is_not_DM)
+    except WithdrawException as e:
+        await ctx.send(f"{e}", ephemeral=is_not_DM)
         return
+    except Exception as e:
+        print(e, "main withdraw")
+        await ctx.send("Error making withdraw. Please contact " + config.MAINTAINER, ephemeral=is_not_DM)
 
-    if message.content.startswith(config.PROMPT):
-        sender: discord.Member = message.author
-        if (len(message.mentions) == 1 and message.mentions[0].id != sender.id):
-            if ((message.mentions[0].bot or message.mentions[0].id == config.BOT_ID) and not config.TESTING):
-                await sender.send(f"{message.author.mention} You can't tip bots!")
-                return
-            if(validator.is_valid_format(message.content)):
-                amount: Balance = Balance.from_tao(parser.get_amount(message.content))
-                recipient = message.mentions[0]
-                recipient_user: Optional[discord.User] = await client.fetch_user(recipient.id)
-                if (recipient_user is None):
-                    await sender.send(f"{message.author.mention} {recipient.mention} is not a valid user!")
-                    return
-                t = Tip(sender.id, recipient.id, amount)
-                result = await t.send(_db, config.COLDKEY_SECRET)
-                if (result):
-                    print(f"{sender} tipped {recipient} {amount.tao} tao")
-                    await channel.send(f"{sender.mention} tipped {recipient.mention} {amount.tao} tao")
-                else:
-                    print(f"{sender} tried to tip {recipient} {amount.tao} tao but failed")
-                    await sender.send(f"You tried to tip {recipient.mention} {amount.tao} tao but it failed")
+    if (t):
+        print(f"{user} withdrew {amount} tao: {new_balance}")
+    else:
+        print(f"{user} tried to withdraw {amount} tao but failed")
 
-    elif isinstance(channel, discord.channel.DMChannel):
-        # might be deposit, withdraw, help, or balance check
-        user: discord.Member = message.author
-        if (validator.is_help(message.content)):
-            await channel.send(config.HELP_STR)
-        elif (validator.is_balance_check(message.content)):
-            balance: Balance = await _db.check_balance(user.id)
-            
-            await channel.send(f"Your balance is {balance.tao} tao")
-        elif (validator.is_deposit_or_withdraw(message.content)):
-            amount: float
-            if (validator.is_deposit(message.content)):
-                amount = 0.0
-            else:
-                try:
-                    amount = parser.get_amount(message.content)
-                except Exception as e:
-                    await channel.send(f"Incorrect format.\n" + config.HELP_STR)
-                    return
-            
-            t = Transaction(user.id, amount)
-            new_balance: int = None
 
-            if (validator.is_deposit(message.content)):
-                try:
-                    await channel.send(f"Remember, withdrawals have a network transfer fee!")
-                    deposit_addr = await _db.get_deposit_addr(t)
-                    if (deposit_addr is None):
-                        await channel.send(f"You don't have a deposit address yet. One will be created for you.")
-                        deposit_addr = await _db.get_deposit_addr(t, config.COLDKEY_SECRET)
-                    await channel.send(f"Please deposit to {deposit_addr}.\nThis address is linked to your discord account.\nOnly you will be able to withdraw from it.")
-                except DepositException as e:
-                    await channel.send(f"Error: {e}")
-                    return
-                except Exception as e:
-                    print(e, "main.on_message")
-                    await channel.send("No deposit addresses available.")
-            else:
-                # must be withdraw
-                coldkeyadd = parser.get_coldkeyadd(message.content)
-                try:
-                    new_balance = await t.withdraw(_db, coldkeyadd, config.COLDKEY_SECRET)
-                    await channel.send(f"Withdrawal successful.\nYour new balance is: {new_balance} tao")
-                except WithdrawException as e:
-                    await channel.send(f"{e}")
-                    return
-                except Exception as e:
-                    print(e, "main withdraw")
-                    await channel.send("Error making withdraw. Please contact " + config.MAINTAINER)
+async def do_deposit( config: config.Config, _db: Database, ctx: interactions.CommandContext, user: interactions.User ):
+    is_not_DM: bool = not await is_in_DM(ctx)
 
-            if (t):
-                print(f"{user} modified balance by {amount} tao: {new_balance}")
-            else:
-                print(f"{user} tried to modify balance by {amount} tao but failed")
-        else:
-            await channel.send(config.HELP_STR)
+    t = Transaction(user.id)
+    new_balance: int = None
 
-async def welcome_new_users( _db: Database, client: discord.Client, config: config.Config):
+    try:
+        await ctx.send(f"Remember, withdrawals have a network transfer fee!", ephemeral=is_not_DM)
+        deposit_addr = await _db.get_deposit_addr(t)
+        if (deposit_addr is None):
+            await ctx.send(f"You don't have a deposit address yet. One will be created for you.", ephemeral=is_not_DM)
+            deposit_addr = await _db.get_deposit_addr(t, config.COLDKEY_SECRET)
+        await ctx.send(f"Please deposit to {deposit_addr}.\nThis address is linked to your discord account.\nOnly you will be able to withdraw from it.", ephemeral=is_not_DM)
+    except DepositException as e:
+        await ctx.send(f"Error: {e}", ephemeral=is_not_DM)
+        return
+    except Exception as e:
+        print(e, "main.on_message")
+        await ctx.send("No deposit addresses available.", ephemeral=is_not_DM)
+
+    
+    if (t):
+        print(f"{user} deposited tao: {new_balance}")
+    else:
+        print(f"{user} tried to deposit tao but failed")
+
+async def do_balance_check(config: config.Config, _db: Database, ctx: interactions.CommandContext, user: interactions.User ):
+    balance: Balance = await _db.check_balance(user.id)
+    is_not_DM: bool = not await is_in_DM(ctx)
+
+    # if ctx is a guild channel, balance is ephemeral
+    await ctx.send(f"Your balance is {balance.tao} tao", ephemeral=is_not_DM)
+
+async def welcome_new_users( _db: Database, client: interactions.Client, config: config.Config):
     if (_db is None):
         return
 
+    await client.wait_until_ready()
+
     users: List[str] = await _db.get_unwelcomed_users()
     for user in tqdm(users, "Welcoming new users..."):
-        discord_user = await client.fetch_user(int(user))
+        discord_user: interactions.User = await interactions.get(client, interactions.User, object_id=user)
+        if (discord_user is None):
+            print(f"{user} is not a valid discord user")
+            continue
         try:
             await discord_user.send(f"""Welcome! You can deposit or withdraw tao using the following commands:\n{config.HELP_STR}
             \nPlease backup your mnemonic on the following website: {config.EXPORT_URL}""")
@@ -159,4 +159,3 @@ async def welcome_new_users( _db: Database, client: discord.Client, config: conf
             print(e)
             print("Can't send welcome message to user...")
         
-

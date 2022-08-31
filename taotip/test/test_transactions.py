@@ -1,17 +1,16 @@
 import random
 from types import SimpleNamespace
-from typing import Dict, List, Set
+from typing import Dict
 from unittest.mock import MagicMock, patch
 
 import bittensor
 from cryptography.fernet import Fernet
-from more_itertools import side_effect
 from scalecodec.base import ScaleBytes
 from substrateinterface import Keypair
 
-from ..src import api, db
-from ..src.config import Config
-from .test_db import DBTestCase
+from taotip.src import api, db
+from taotip.src.config import Config
+from taotip.test.test_db import DBTestCase
 
 mock_config_: SimpleNamespace = SimpleNamespace(
     DISCORD_TOKEN = ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-', k=59)),

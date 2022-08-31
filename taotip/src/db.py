@@ -20,6 +20,7 @@ class Database:
 
     async def check_balance(self, user_id: str) -> Balance:
         assert self.db is not None
+        assert self.api is not None
         # Get the address for the user
         addr: Address = self.get_address_by_user(user_id)
         if addr is None:
@@ -281,7 +282,7 @@ class Transaction:
     user: str
     fee: float
 
-    def __init__(self, user:str, amount: float, time: datetime = datetime.now()) -> None:
+    def __init__(self, user:str, amount: float = 0.0, time: datetime = datetime.now()) -> None:
         self.amount = amount
         self.user = user
         self.time = time
