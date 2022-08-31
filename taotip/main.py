@@ -176,7 +176,7 @@ def main() -> None:
 
         @bot.component("cancel_tip")
         async def cancel_response(ctx: interactions.ComponentContext):
-            await ctx.send("Tip cancelled", ephemeral=True)
+            return interactions.StopCommand()
 
         @bot.command(
             name="balance",
