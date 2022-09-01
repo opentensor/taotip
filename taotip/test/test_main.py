@@ -192,6 +192,7 @@ class TestMain(DBTestCase):
             id=user,
             bot=False,
             user=mock_user,
+            send=mock_user_send,
         )
 
         mock_ctx = MagicMock(
