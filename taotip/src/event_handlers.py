@@ -70,14 +70,19 @@ async def check_enough_tao( config: config.Config, _db: Database, ctx: interacti
     return True
 
 
-async def tip_user( config: config.Config, _db: Database, ctx: interactions.context._Context, sender: interactions.User, recipient: interactions.User, amount: Balance) -> None:
+async def tip_user( config: config.Config, _db: Database, bot: interactions.Client, ctx: interactions.context._Context, sender: interactions.User, recipient: interactions.User, amount: Balance) -> None:
     is_not_DM: bool = not await is_in_DM(ctx)
 
     t = Tip(sender.id, recipient.id, amount)
     try:
         result = await t.send(_db, config.COLDKEY_SECRET)
     except FeeException as e:
-        await ctx.member.send(f"You do not have enough balance to tip {amount.tao} tao with fee {e.fee.tao}", ephemeral=is_not_DM)
+        try:
+            member: interactions.Member = await interactions.get(bot, interactions.Member, parent_id=config.BITTENSOR_DISCORD_SERVER, objected_id=sender.id)
+            await member.send(f"You do not have enough balance to tip {amount.tao} tao with fee {e.fee.tao}")
+        except Exception as e:
+            print(e)
+            
         await ctx.send("Tip Canceled")
         await ctx.message.delete()
         return
@@ -87,7 +92,12 @@ async def tip_user( config: config.Config, _db: Database, ctx: interactions.cont
         await ctx.send(f"{sender.mention} tipped {recipient.mention} {amount.tao} tao")
     else:
         print(f"{sender} tried to tip {recipient} {amount.tao} tao but failed")
-        await ctx.member.send(f"You tried to tip {recipient.mention} {amount.tao} tao but it failed", ephemeral=is_not_DM)
+        try:
+            member: interactions.Member = await interactions.get(bot, interactions.Member, parent_id=config.BITTENSOR_DISCORD_SERVER, objected_id=sender.id)
+            await member.send(f"You tried to tip {recipient.mention} {amount.tao} tao but it failed")
+        except Exception as e:
+            print(e)
+
         await ctx.send("Tip Canceled")
         await ctx.message.delete()
 
