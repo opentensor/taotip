@@ -187,6 +187,13 @@ class TestMain(DBTestCase):
             send=mock_user_send
         )
 
+        mock_sender = MagicMock(
+            spec=interactions.Member,
+            id=user,
+            bot=False,
+            user=mock_user,
+        )
+
         mock_ctx = MagicMock(
             spec=interactions.CommandContext,
             author=SimpleNamespace(
@@ -215,8 +222,16 @@ class TestMain(DBTestCase):
             send=mock_tip_send
         )
 
+        mock_client = MagicMock(
+            spec=interactions.Client,
+            get=AsyncMock(
+                return_value=mock_sender,
+            ),
+        )
+            
+
         with patch.object(db.Tip, '__new__', return_value=mock_tip) as mock_tip_new:
-            await main.tip_user(self.mock_config, self._db, mock_ctx, mock_user, mock_recipient, amount)
+            await main.tip_user(self.mock_config, self._db, mock_client, mock_ctx, mock_user, mock_recipient, amount)
             mock_tip_new.assert_called_once_with(db.Tip, user, recipient, amount)
             mock_tip_send.assert_called_once() # Someone tipped someone...
             

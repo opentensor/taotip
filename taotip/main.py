@@ -110,7 +110,7 @@ def main() -> None:
                 return interactions.StopCommand()
             
             await ctx.defer()
-            await event_handlers.tip_user(config, _db, ctx, ctx.user, recipient.user, Balance.from_tao(amount))
+            await event_handlers.tip_user(config, _db, bot, ctx, ctx.user, recipient.user, Balance.from_tao(amount))
 
         @bot.command(
             name="tip",
