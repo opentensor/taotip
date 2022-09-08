@@ -165,7 +165,7 @@ class TestMain(DBTestCase):
             await main.do_withdraw(mock_config, self._db, mock_ctx, mock_user, withd_addr.address, amount)
 
             mock_withdraw.assert_called_once_with(self._db, withd_addr.address, mock_config.COLDKEY_SECRET)
-            mock_send.assert_awaited_once_with(Contains(f'Your new balance is: {mock_new_balance.tao} tao'))
+            mock_send.assert_awaited_once_with(Contains(f'Your new balance is: {mock_new_balance.tao} tao'), ephemeral=True)
 
     async def test_tip_user(self):
         user: int = random.randint(1, 10000000)
