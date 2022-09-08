@@ -105,7 +105,7 @@ async def tip_user( config: config.Config, _db: Database, bot: interactions.Clie
 async def do_withdraw( config: config.Config, _db: Database, ctx: interactions.CommandContext, user: interactions.User, ss58_address: str, amount: Balance):
     is_not_DM: bool = not await is_in_DM(ctx)
 
-    t = Transaction(user.id, amount)
+    t = Transaction(user.id, amount.tao)
     new_balance: int = None
 
     # must be withdraw
@@ -123,6 +123,8 @@ async def do_withdraw( config: config.Config, _db: Database, ctx: interactions.C
         print(f"{user} withdrew {amount} tao: {new_balance}")
     else:
         print(f"{user} tried to withdraw {amount} tao but failed")
+    
+    return None
 
 
 async def do_deposit( config: config.Config, _db: Database, ctx: interactions.CommandContext, user: interactions.User ):
