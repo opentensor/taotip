@@ -167,7 +167,7 @@ async def welcome_new_users( _db: Database, client: interactions.Client, config:
     await client.wait_until_ready()
 
     users: List[str] = await _db.get_unwelcomed_users()
-    for user in tqdm(users, "Welcoming new users..."):
+    for user in tqdm(users, f"Welcoming new users... {[user for user in users]}"):
         discord_user: interactions.Member = await interactions.get(client, interactions.Member, object_id=user, parent_id=config.BITTENSOR_DISCORD_SERVER)
 
         if (discord_user is None):
@@ -179,5 +179,5 @@ async def welcome_new_users( _db: Database, client: interactions.Client, config:
             await _db.set_welcomed_user(user, True)
         except Exception as e:
             print(e)
-            print("Can't send welcome message to user...")
+            print(f"Can't send welcome message to user... {discord_user.name} ({discord_user.id})")
         
