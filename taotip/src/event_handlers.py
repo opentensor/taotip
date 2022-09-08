@@ -181,7 +181,7 @@ async def welcome_new_users( _db: Database, client: interactions.Client, config:
             print(e)
             print(f"Can't send welcome message to user... {discord_user.name} ({discord_user.id})")
             print("Trying to send to maintainer...")
-            maintainer: interactions.Member = await interactions.get(client, interactions.Member, object_id=config.MAINTAINER, parent_id=config.BITTENSOR_DISCORD_SERVER)
+            maintainer: interactions.Member = await interactions.get(client, interactions.Member, object_id=int(config.MAINTAINER[2:-1]), parent_id=config.BITTENSOR_DISCORD_SERVER)
             await maintainer.send(f"Can't send welcome message to user... {discord_user.name} ({discord_user.id})")
             await _db.set_welcomed_user(user, True)
 
