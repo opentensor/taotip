@@ -14,6 +14,7 @@ services:
       - ./mongodb/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
   taotip:
     container_name: taotip
+    restart: always
     build:
       context: ./taotip/
       dockerfile: Dockerfile
@@ -25,6 +26,7 @@ services:
       - backend
   export-service:
     container_name: export-service
+    restart: always
     build:
       context: ./taotip-export/
       dockerfile: Dockerfile
@@ -35,6 +37,7 @@ services:
 
   nginx:
     image: nginx:1.15-alpine
+    restart: always
     ports:
       - "80:80"
       - "443:443"
@@ -46,6 +49,7 @@ services:
       - backend
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
   certbot:
+    restart: on-failure[:2] # restart on failure, max 2 times
     image: certbot/certbot
     volumes:
       - ./certbot/conf:/etc/letsencrypt
